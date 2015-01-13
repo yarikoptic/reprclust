@@ -31,6 +31,11 @@ __license__ = 'MIT'
 
 import numpy as np
 import skimage.filter
+
+from mvpa2.base.dataset import vstack as dsvstack
+from mvpa2.mappers.fx import mean_group_sample
+from mvpa2.datasets.base import Dataset
+from mvpa2.mappers.flatten import FlattenMapper
 from mvpa2.misc.neighborhood import Sphere
 
 # Target sample dissimilarities to "simulate"
@@ -47,7 +52,7 @@ def vector_form(m):
 
 def filter_each_2d(d, sigma):
     if d.ndim == 3:
-        # rollaxis is to move "hstacked" last dimension back to its place
+        # rollaxis is to move "vstacked" last dimension back to its place
         return np.rollaxis(
                  np.array([
                        skimage.filter.gaussian_filter(d[..., i], sigma)
@@ -118,7 +123,8 @@ def simple_sim1(shape, dissims,
         raise ValueError("I know only circle")
 
     # Now lets generate per subject and per run data by adding some noise(s)
-    all_signals = []
+    # all_signals = []
+    dss = []
     for isubject in xrange(nsubjects):
         # Interesting noise, simulating some underlying process which has nothing
         # to do with original design/similarity but having spatial structure which
@@ -131,7 +137,8 @@ def simple_sim1(shape, dissims,
                            intrinsic_smooth_sigma)
             for i in xrange(intrinsic_n)]
 
-        subject_signals = []
+        # subject_signals = []
+        dss_subject = []
         for run in range(nruns):
             signal_run = signal_clean.copy()
             for intrinsic_noise in intrinsic_noises:
@@ -139,31 +146,53 @@ def simple_sim1(shape, dissims,
             signal_run += filter_each_2d(
                 np.random.normal(size=signal_clean.shape)*normal_std,
                 normal_smooth_sigma)
-            subject_signals.append(signal_run)
-        all_signals.append(subject_signals)
+            # rollaxis to bring similarities into leading dimension
+            ds = Dataset(np.rollaxis(signal_run, 2, 0))
+            ds.sa['chunks'] = [run]
+            ds.sa['dissimilarity'] = np.arange(len(dissim)) # Lame one for now
+            ds_flat = ds.get_mapped(FlattenMapper(shape=ds.shape[1:], space='pixel_indices'))
+            dss_subject.append(ds_flat)
+            #subject_signals.append(signal_run)
+        #all_signals.append(subject_signals)
+        ds = dsvstack(dss_subject)
+        ds.a['mapper'] = dss_subject[0].a.mapper   # .a are not transferred by vstack
+        dss.append(ds)
 
     # Instrumental noise -- the most banal
-    assert(len(all_signals) == nsubjects)
-    assert(len(all_signals[0]) == nruns)
+    assert(len(dss) == nsubjects)
+    assert(len(dss) == nsubjects)
+    assert(len(dss[0]) == nruns*len(dissim))
 
-    return signal_clean, all_signals
+    return signal_clean, dss
 
 if __name__ == '__main__':
-    a_clean, a_all = simple_sim1((64, 64), [[1], [0.8], [0.5], [0.3]],
+    a_clean, dss = simple_sim1((64, 64), [[1], [0.8], [0.5], [0.3]],
                                  roi_neighborhood=Sphere(6),
                                  nruns=3, nsubjects=2,
                                  intrinsic_n=1, intrinsic_smooth_sigma=5, intrinsic_std=5,
                                  normal_smooth_sigma=1.5, normal_std=4)
+
+    # just a little helper
+    def get2d(ds):
+        return dss[0].a.mapper.reverse(ds)
+
     import pylab as pl
     pl.clf()
+    DS = dsvstack(dss)
     # Sample plots
     for s in [0, 1]:
-        pl.subplot(3,3,1+s*3); pl.imshow(a_all[s][0][..., 0], interpolation='nearest'); pl.ylabel('subj%d' % s);  pl.xlabel('run1');
-        pl.subplot(3,3,2+s*3); pl.imshow(a_all[s][1][..., 0], interpolation='nearest'); pl.xlabel('run2');
-        pl.subplot(3,3,3+s*3); pl.imshow(np.mean(a_all[s], axis=0)[..., 0], interpolation='nearest'); pl.xlabel('mean');
-    s_mean = np.mean(a_all, axis=0); s=2
-    pl.subplot(3,3,1+s*3); pl.imshow(s_mean[0][..., 0], interpolation='nearest'); pl.ylabel('mean(subj)');  pl.xlabel('run1');
-    pl.subplot(3,3,2+s*3); pl.imshow(s_mean[1][..., 0], interpolation='nearest'); pl.xlabel('run2');
-    pl.subplot(3,3,3+s*3); pl.imshow(np.mean(s_mean, axis=0)[..., 0], interpolation='nearest'); pl.xlabel('mean');
+        ds2 = get2d(dss[0])
+        for r in [0, 1]:
+            pl.subplot(3,3,1+r+s*3); pl.imshow(ds2[ds2.sa.chunks == r].samples[0], interpolation='nearest'); pl.ylabel('subj%d' % s);  pl.xlabel('run1');
+        pl.subplot(3,3,3+s*3); pl.imshow(get2d(mean_group_sample(['dissimilarity'])(dss[0]).samples)[0], interpolation='nearest'); pl.xlabel('mean');
+
+    ds = dsvstack(dss)
+    ds.a['mapper'] = dss[0].a.mapper
+    ds_mean = mean_group_sample(['dissimilarity', 'chunks'])(ds)
+    for r in [0, 1]:
+        ds_mean_run0 = ds.a.mapper.reverse(ds_mean[ds_mean.chunks == r])
+        pl.subplot(3,3,1+r+2*3); pl.imshow(ds_mean_run0.samples[0], interpolation='nearest'); pl.ylabel('mean(subj)');  pl.xlabel('run%d' % r)
+    ds_global_mean = mean_group_sample(['dissimilarity'])(ds)
+    pl.subplot(3,3,3+2*3); pl.imshow(get2d(ds_global_mean).samples[0], interpolation='nearest'); pl.xlabel('mean');
 
 pl.show()
