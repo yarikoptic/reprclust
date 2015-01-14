@@ -38,6 +38,7 @@ from mvpa2.datasets.base import Dataset
 from mvpa2.mappers.flatten import FlattenMapper
 from mvpa2.misc.neighborhood import Sphere
 
+import pylab as pl
 # Target sample dissimilarities to "simulate"
 DISSIM6 = []
 
@@ -94,9 +95,21 @@ def simple_sim1(shape, dissims,
     """
     ndissims = len(dissims)
 
+    # first we fisher transform so we can add normal noise
+    # check first that we don't have extreme values that might give infinity
+    dissims = np.array(dissims)
+    dissims = 1. - dissims
+    dissims[dissims==1] = 0.99
+    dissims[dissims==-1] = -0.99
+    # fisher
+    dissims = np.arctanh(dissims)
+
     # generate target clean "picture"
     d = np.asanyarray(dissims[0])
     signal_clean = np.zeros(shape + (len(vector_form(d)),))
+
+    # generate ground truth for clustering
+    cluster_truth = np.zeros(shape, dtype='int')
 
     if rois_arrangement == 'circle':
         radius = min(shape[:2])/4.
@@ -114,11 +127,12 @@ def simple_sim1(shape, dissims,
             roi_center = center.copy()
             roi_center[0] += int(radius * np.cos(2*np.pi*i/ndissims))
             roi_center[1] += int(radius * np.sin(2*np.pi*i/ndissims))
-            for coords in  roi_neighborhood(roi_center):
+            for coords in roi_neighborhood(roi_center):
                 acoords = np.asanyarray(coords)
                 if np.all(acoords >= [0]*len(coords)) and \
                    np.all(acoords < signal_clean.shape[:len(coords)]):
                     signal_clean.__setitem__(coords, dissim)
+                    cluster_truth.__setitem__(coords, i+1)
     else:
         raise ValueError("I know only circle")
 
@@ -146,6 +160,8 @@ def simple_sim1(shape, dissims,
             signal_run += filter_each_2d(
                 np.random.normal(size=signal_clean.shape)*normal_std,
                 normal_smooth_sigma)
+            # go back to correlations with inverse of fisher
+            signal_run = 1. - np.tanh(signal_run)
             # rollaxis to bring similarities into leading dimension
             ds = Dataset(np.rollaxis(signal_run, 2, 0))
             ds.sa['chunks'] = [run]
@@ -163,7 +179,7 @@ def simple_sim1(shape, dissims,
     assert(len(dss) == nsubjects)
     assert(len(dss[0]) == nruns*len(dissim))
 
-    return signal_clean, dss
+    return signal_clean, cluster_truth, dss
 
 if __name__ == '__main__':
     a_clean, dss = simple_sim1((64, 64), [[1], [0.8], [0.5], [0.3]],
