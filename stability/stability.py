@@ -130,7 +130,7 @@ def compute_stability(splitter, samples, method='ward', stack=False,
         n_jobs: number of jobs to run the parallelization. default n_jobs=1
         kwargs: optional keyword arguments being passed to the clustering method
                 (only for 'ward', and 'gmm'). Useful to pass connectivity matrix (ward)
-                or covariance structure (GMM)
+                or covariance structure and random initial state (GMM).
     
     Attributes:
         result: a (max_k-1, 3) array, where result[:, 0] is the ARI, 
