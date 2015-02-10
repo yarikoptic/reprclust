@@ -57,24 +57,26 @@ def compute_stability_fold(samples, train, test, method='ward',
         test_ds = np.mean(np.dstack(test_set), axis=2)
 
     # compute clustering on training set
-    if method is 'complete': 
+    if method == 'complete':
         train_ds_dist = pdist(train_ds.T, metric='correlation')
         test_ds_dist = pdist(test_ds.T, metric='correlation')
         # I'm computing the full tree and then cutting afterwards to speed computation
         Y_train = complete(train_ds_dist)
         # same on testing set
         Y_test = complete(test_ds_dist)
-    elif method is 'ward':
+    elif method == 'ward':
         (children_train, n_comp_train, 
          n_leaves_train, parents_train) = ward_tree(train_ds.T, **kwargs)
         # same on testing set
         (children_test, n_comp_test, 
          n_leaves_test, parents_test) = ward_tree(test_ds.T, **kwargs)
-    elif method is 'gmm':
+    elif method == 'gmm':
         pass  # we'll have to run it for each k
+    else:
+        raise ValueError("We shouldn't get here")
 
     for i_k, k in enumerate(range(2, max_k+1)):
-        if method is 'complete':
+        if method == 'complete':
             # cut the tree with right K for both train and test
             train_label = cut_tree_scipy(Y_train, k)
             test_label = cut_tree_scipy(Y_test, k)
@@ -85,7 +87,7 @@ def compute_stability_fold(samples, train, test, method='ward',
             knn.fit(train_ds.T, train_label)
             # predict the clusters in the test set
             prediction_label = knn.predict(test_ds.T)
-        elif method is 'ward':
+        elif method == 'ward':
             # cut the tree with right K for both train and test
             train_label = _hc_cut(k, children_train, n_leaves_train)
             test_label = _hc_cut(k, children_test, n_leaves_test)
@@ -95,7 +97,7 @@ def compute_stability_fold(samples, train, test, method='ward',
             knn.fit(train_ds.T, train_label)
             # predict the clusters in the test set
             prediction_label = knn.predict(test_ds.T)
-        elif method is 'gmm':
+        elif method == 'gmm':
             gmm = GMM(n_components=k, **kwargs)
             # fit on train and predict test
             gmm.fit(train_ds.T)
@@ -104,10 +106,13 @@ def compute_stability_fold(samples, train, test, method='ward',
             # fit on test and get labels
             gmm.fit(test_ds.T)
             test_label = gmm.predict(test_ds.T)
+        else:
+            raise ValueError("We shouldn't get here")
             
         # append results
         result[i_k, 0] = adjusted_rand_score(prediction_label, test_label)
-        result[i_k, 1] = adjusted_mutual_info_score(prediction_label, test_label)
+        result[i_k, 1] = adjusted_mutual_info_score(prediction_label,
+                                                    test_label)
 
     result[:, 2] = range(2, max_k+1)
 
@@ -142,7 +147,6 @@ def compute_stability(splitter, samples, method='ward', stack=False,
                                      (samples, train, test, method=method,
                                      max_k=max_k, stack=stack, **kwargs)
                                      for train, test in splitter)
-
 
     result = np.vstack(result)
     
