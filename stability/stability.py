@@ -18,8 +18,7 @@ def cut_tree_scipy(Y, k):
 
 
 def compute_stability_fold(samples, train, test, method='ward', 
-                         max_k=300, stack=False, random_state_gmm=None,
-                         **kwargs):
+                         max_k=300, stack=False, **kwargs):
     """
     General function to compute the stability on a fold.
     
@@ -32,8 +31,7 @@ def compute_stability_fold(samples, train, test, method='ward',
         method: method to use. atm only 'ward', 'complete', and 'gmm' are implemented.
         max_k: maximum k to compute the stability testing.
         stack: if False, datasets are averaged; if True, they are stacked.
-        random_state_gmm: a random state for initialization of GMM.
-        kwargs: optional keyword arguments being passed to the clustering method 
+        kwargs: optional keyword arguments being passed to the clustering method
                 (only for 'ward', and 'gmm')
     
     Attributes:
@@ -98,8 +96,7 @@ def compute_stability_fold(samples, train, test, method='ward',
             # predict the clusters in the test set
             prediction_label = knn.predict(test_ds.T)
         elif method is 'gmm':
-            gmm = GMM(n_components=k, random_state=random_state_gmm, 
-                      **kwargs)
+            gmm = GMM(n_components=k, **kwargs)
             # fit on train and predict test
             gmm.fit(train_ds.T)
             prediction_label = gmm.predict(test_ds.T)
@@ -118,7 +115,7 @@ def compute_stability_fold(samples, train, test, method='ward',
 
 
 def compute_stability(splitter, samples, method='ward', stack=False,
-                      max_k=300, n_jobs=1, random_state_gmm=None, **kwargs):
+                      max_k=300, n_jobs=1, **kwargs):
     """
     General function to compute the stability of clustering on a dataset.
     
@@ -131,8 +128,7 @@ def compute_stability(splitter, samples, method='ward', stack=False,
         stack: if False, datasets are averaged; if True, they are stacked.
         max_k: maximum k to compute the stability testing.
         n_jobs: number of jobs to run the parallelization. default n_jobs=1
-        random_state_gmm: a random state for initialization of GMM.
-        kwargs: optional keyword arguments being passed to the clustering method 
+        kwargs: optional keyword arguments being passed to the clustering method
                 (only for 'ward', and 'gmm'). Useful to pass connectivity matrix (ward)
                 or covariance structure (GMM)
     
@@ -143,10 +139,9 @@ def compute_stability(splitter, samples, method='ward', stack=False,
     """    
     
     result = Parallel(n_jobs=n_jobs)(delayed(compute_stability_fold)
-                                  (samples, train, test, method=method, 
-                                   max_k=max_k, stack=stack, random_state_gmm=random_state_gmm,
-                                   **kwargs)
-                                   for train, test in splitter)
+                                     (samples, train, test, method=method,
+                                     max_k=max_k, stack=stack, **kwargs)
+                                     for train, test in splitter)
 
 
     result = np.vstack(result)
