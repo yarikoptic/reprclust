@@ -7,9 +7,10 @@ from sklearn.metrics.cluster import adjusted_rand_score, adjusted_mutual_info_sc
 from sklearn.cluster.hierarchical import _hc_cut, ward_tree
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import GMM
+from sklearn.cluster import KMeans
 
 from joblib import Parallel, delayed
-AVAILABLE_METHODS = ['ward', 'complete', 'gmm']
+AVAILABLE_METHODS = ['ward', 'complete', 'gmm', 'kmeans']
 
 
 def cut_tree_scipy(Y, k):
@@ -28,7 +29,8 @@ def compute_stability_fold(samples, train, test, method='ward',
                  We are clustering the features, i.e., the nodes.
         train: a list of indices for the training set
         test: a list of indices for the test set
-        method: method to use. atm only 'ward', 'complete', and 'gmm' are implemented.
+        method: method to use. atm only 'ward', 'complete', 'gmm',
+                and 'kmeans' are implemented.
         max_k: maximum k to compute the stability testing.
         stack: if False, datasets are averaged; if True, they are stacked.
         kwargs: optional keyword arguments being passed to the clustering method
@@ -70,7 +72,7 @@ def compute_stability_fold(samples, train, test, method='ward',
         # same on testing set
         (children_test, n_comp_test, 
          n_leaves_test, parents_test) = ward_tree(test_ds.T, **kwargs)
-    elif method == 'gmm':
+    elif method == 'gmm' or method == 'kmeans':
         pass  # we'll have to run it for each k
     else:
         raise ValueError("We shouldn't get here")
@@ -106,6 +108,15 @@ def compute_stability_fold(samples, train, test, method='ward',
             # fit on test and get labels
             gmm.fit(test_ds.T)
             test_label = gmm.predict(test_ds.T)
+        elif method == 'kmeans':
+            kmeans = KMeans(n_clusters=k, **kwargs)
+            #fit on train and predict test
+            kmeans.fit(train_ds.T)
+            prediction_label = kmeans.predict(test_ds.T)
+
+            #fit on test and get labels
+            kmeans.fit(test_ds.T)
+            test_label = kmeans.predict(test_ds.T)
         else:
             raise ValueError("We shouldn't get here")
             
@@ -129,7 +140,8 @@ def compute_stability(splitter, samples, method='ward', stack=False,
         samples: a list of arrays containing the samples to cluster, each
                  array has shape (n_samples, n_features) in PyMVPA terminology.
                  We are clustering the features, i.e., the voxels/nodes.
-        method: method to use. atm only 'ward', 'complete', and 'gmm' are implemented.
+        method: method to use. atm only 'ward', 'complete', 'gmm',
+                and 'kmeans' are implemented.
         stack: if False, datasets are averaged; if True, they are stacked.
         max_k: maximum k to compute the stability testing.
         n_jobs: number of jobs to run the parallelization. default n_jobs=1
