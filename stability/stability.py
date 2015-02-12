@@ -18,7 +18,7 @@ def cut_tree_scipy(Y, k):
     return _hc_cut(k, children, len(children)+1)
 
 
-def compute_stability_fold(samples, train, test, method='ward', 
+def compute_stability_fold(samples, train, test, method='ward',
                            max_k=300, stack=False, cv_likelihood=False,
                            **kwargs):
     """
@@ -40,8 +40,10 @@ def compute_stability_fold(samples, train, test, method='ward',
                 (only for 'ward', and 'gmm')
     
     Attributes:
-        result: a (max_k-1, 3) array, where result[:, 0] is the ARI, 
+        result: a (max_k-1, 3) array, where result[:, 0] is the ARI,
                 result[:, 1] is the AMI, and result[:, 2] is the k.
+                if method is 'gmm' and cv_likelihood is True, result[:, 2]
+                is the cross-validated likelihood, and k moves to result[:, 3]
         
     """    
     if method not in AVAILABLE_METHODS:
@@ -52,7 +54,10 @@ def compute_stability_fold(samples, train, test, method='ward',
             "Cross-validated likelihood is only available for 'gmm' method")
     
     # preallocate matrix for results
-    result = np.zeros((max_k-1, 2))
+    if cv_likelihood:
+        result = np.zeros((max_k-1, 4))
+    else:
+        result = np.zeros((max_k-1, 3))
 
     # get training and test
     train_set = [samples[x] for x in train]
@@ -111,18 +116,18 @@ def compute_stability_fold(samples, train, test, method='ward',
             # fit on train and predict test
             gmm.fit(train_ds.T)
             prediction_label = gmm.predict(test_ds.T)
-            log_prob = np.sum(gmm.score(test_ds.T))
-            
+            if cv_likelihood:
+                log_prob = np.sum(gmm.score(test_ds.T))
             # fit on test and get labels
             gmm.fit(test_ds.T)
             test_label = gmm.predict(test_ds.T)
         elif method == 'kmeans':
             kmeans = KMeans(n_clusters=k, **kwargs)
-            #fit on train and predict test
+            # fit on train and predict test
             kmeans.fit(train_ds.T)
             prediction_label = kmeans.predict(test_ds.T)
 
-            #fit on test and get labels
+            # fit on test and get labels
             kmeans.fit(test_ds.T)
             test_label = kmeans.predict(test_ds.T)
         else:
@@ -132,15 +137,10 @@ def compute_stability_fold(samples, train, test, method='ward',
         result[i_k, 0] = adjusted_rand_score(prediction_label, test_label)
         result[i_k, 1] = adjusted_mutual_info_score(prediction_label,
                                                     test_label)
-
-        if cv_likelihood and method == 'gmm':
-            if result.shape[1] == 2:
-                result = np.hstack((result, np.zeros((max_k-1, 1))))
-            else:
-                pass
+        if cv_likelihood:
             result[i_k, 2] = log_prob
 
-    result = np.hstack((result, np.array(range(2, max_k+1))[:,None]))
+    result[:, -1] = range(2, max_k+1)
 
     return result
 
