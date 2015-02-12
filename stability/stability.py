@@ -19,7 +19,8 @@ def cut_tree_scipy(Y, k):
 
 
 def compute_stability_fold(samples, train, test, method='ward', 
-                         max_k=300, stack=False, **kwargs):
+                           max_k=300, stack=False, cv_likelihood=False,
+                           **kwargs):
     """
     General function to compute the stability on a fold.
     
@@ -33,6 +34,8 @@ def compute_stability_fold(samples, train, test, method='ward',
                 and 'kmeans' are implemented.
         max_k: maximum k to compute the stability testing.
         stack: if False, datasets are averaged; if True, they are stacked.
+        cv_likelihood: compute the cross-validated likelihood for mixture model;
+                       only valid if 'gmm' method is used.
         kwargs: optional keyword arguments being passed to the clustering method
                 (only for 'ward', and 'gmm')
     
@@ -43,9 +46,13 @@ def compute_stability_fold(samples, train, test, method='ward',
     """    
     if method not in AVAILABLE_METHODS:
         raise ValueError('Method {0} not implemented'.format(method))
+
+    if cv_likelihood and method != 'gmm':
+        raise ValueError(
+            "Cross-validated likelihood is only available for 'gmm' method")
     
     # preallocate matrix for results
-    result = np.zeros((max_k-1, 3))
+    result = np.zeros((max_k-1, 2))
 
     # get training and test
     train_set = [samples[x] for x in train]
@@ -104,6 +111,7 @@ def compute_stability_fold(samples, train, test, method='ward',
             # fit on train and predict test
             gmm.fit(train_ds.T)
             prediction_label = gmm.predict(test_ds.T)
+            log_prob = np.sum(gmm.score(test_ds.T))
             
             # fit on test and get labels
             gmm.fit(test_ds.T)
@@ -125,13 +133,20 @@ def compute_stability_fold(samples, train, test, method='ward',
         result[i_k, 1] = adjusted_mutual_info_score(prediction_label,
                                                     test_label)
 
-    result[:, 2] = range(2, max_k+1)
+        if cv_likelihood and method == 'gmm':
+            if result.shape[1] == 2:
+                result = np.hstack((result, np.zeros((max_k-1, 1))))
+            else:
+                pass
+            result[i_k, 2] = log_prob
+
+    result = np.hstack((result, np.array(range(2, max_k+1))[:,None]))
 
     return result
 
 
 def compute_stability(splitter, samples, method='ward', stack=False,
-                      max_k=300, n_jobs=1, **kwargs):
+                      cv_likelihood=False, max_k=300, n_jobs=1, **kwargs):
     """
     General function to compute the stability of clustering on a dataset.
     
@@ -143,6 +158,8 @@ def compute_stability(splitter, samples, method='ward', stack=False,
         method: method to use. atm only 'ward', 'complete', 'gmm',
                 and 'kmeans' are implemented.
         stack: if False, datasets are averaged; if True, they are stacked.
+        cv_likelihood: compute the cross-validated likelihood for mixture model;
+                       only valid if 'gmm' method is used
         max_k: maximum k to compute the stability testing.
         n_jobs: number of jobs to run the parallelization. default n_jobs=1
         kwargs: optional keyword arguments being passed to the clustering method
@@ -151,14 +168,16 @@ def compute_stability(splitter, samples, method='ward', stack=False,
     
     Attributes:
         result: a (max_k-1, 3) array, where result[:, 0] is the ARI, 
-                result[:, 1] is the AMI, and result[:, 2] is the k.
+                result[:, 1] is the AMI, and result[:, 2] is the k;
+                if method is 'gmm' and cv_likelihood is True, result[:, 2]
+                is the cross-validated likelihood, and k moves to result[:, 3]
         
     """    
     
     result = Parallel(n_jobs=n_jobs)(delayed(compute_stability_fold)
                                      (samples, train, test, method=method,
-                                     max_k=max_k, stack=stack, **kwargs)
-                                     for train, test in splitter)
+                                     max_k=max_k, stack=stack, cv_likelihood=cv_likelihood,
+                                     **kwargs) for train, test in splitter)
 
     result = np.vstack(result)
     
