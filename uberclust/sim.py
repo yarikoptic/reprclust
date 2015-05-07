@@ -82,6 +82,15 @@ def get_intrinsic_noises(shape, std, sigma, n=1):
     return [filter_each_2d(np.random.normal(size=shape)*std, sigma)
             for i in xrange(n)]
 
+def generate_mixins(npoints):
+    """Generate random mixins with some coloring and offset"""
+    data = np.random.normal(size=npoints)
+    assert(len(data) == npoints)
+    from scipy.stats import norm
+    x = np.arange(npoints)
+    kernel = norm.pdf(x/5. - 1.)
+    data_filtered = np.convolve(data, kernel)[:len(data)] + np.random.normal()
+    return data_filtered
 
 def simple_sim1(shape, dissims,
                 rois_arrangement='circle',
@@ -204,12 +213,16 @@ def simple_sim1(shape, dissims,
         dss_subject = []
         subj_common_noises = [noise * np.random.normal()
                               for noise in common_noises]
+
+        subj_specific_mixins = generate_mixins(nruns)
+        subj_common_mixins = generate_mixins(nruns)
+
         for run in range(nruns):
             signal_run = signal_clean.copy()
             for noise in subj_specific_noises:
-                signal_run += noise * np.random.normal()
+                signal_run += noise * subj_specific_mixins[run]
             for noise in subj_common_noises:
-                signal_run += noise * np.random.normal()
+                signal_run += noise * subj_common_mixins[run]
             # generic noise -- no common structure across subjects/runs
             signal_run += filter_each_2d(
                 np.random.normal(size=signal_clean.shape)*noise_independent_std,
