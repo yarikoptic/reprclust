@@ -183,7 +183,7 @@ def simple_sim1(shape, dissims,
         std=noise_common_std,
         sigma=noise_common_smooth,
         n=noise_common_n)
-    assert common_noises[0].ndim == 2, "There should be no time comp"
+    assert common_noises[0].ndim == 3, "There should be no time comp"
 
     # Now lets generate per subject and per run data by adding some noise(s)
     # all_signals = []
@@ -199,7 +199,7 @@ def simple_sim1(shape, dissims,
                                                 std=noise_subject_std,
                                                 sigma=noise_subject_smooth,
                                                 n=noise_subject_n)
-        assert subj_specific_noises[0].ndim == 2, "There should be no time comp"
+        assert subj_specific_noises[0].ndim == 3, "There should be no time comp"
         # subject_signals = []
         dss_subject = []
         subj_common_noises = [noise * np.random.normal()
@@ -214,8 +214,9 @@ def simple_sim1(shape, dissims,
             signal_run += filter_each_2d(
                 np.random.normal(size=signal_clean.shape)*noise_independent_std,
                 noise_independent_smooth)
+
             # go back to correlations with inverse of fisher
-            signal_run = 1. - np.tanh(signal_run)
+            signal_run = np.tanh(signal_run)
             # rollaxis to bring similarities into leading dimension
             ds = Dataset(np.rollaxis(signal_run, 2, 0))
             ds.sa['chunks'] = [run]
@@ -234,7 +235,7 @@ def simple_sim1(shape, dissims,
     assert(len(dss) == nsubjects)
     assert(len(dss[0]) == nruns*len(dissim))
 
-    return signal_clean, cluster_truth, dss
+    return np.tanh(signal_clean), cluster_truth, dss
 
 if __name__ == '__main__':
     a_clean, cluster_truth, dss = simple_sim1(

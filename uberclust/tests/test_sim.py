@@ -27,11 +27,13 @@
 
 import numpy as np
 
-from nose.tools import assert_equal, assert_greater_equal
+from nose.tools import assert_equal, assert_greater_equal, assert_true
 
 from mvpa2.misc.neighborhood import Sphere
 
 from ..sim import get_intrinsic_noises, simple_sim1
+
+from numpy.testing import assert_array_almost_equal
 
 def test_get_intrinsic_noises():
     # very rudimentary test to see that noone tricks us up
@@ -47,15 +49,69 @@ def test_get_intrinsic_noises():
 
 def test_simple_sim1_clean_per_subject():
     # no noise -- all must be clear
-    dissims = [[1], [0.8], [0.5], [0.3]]
+    dissims = [[0.9], [0.8], [0.5], [0.3]]
     args = (64, 64), dissims
     kwargs = dict(
         roi_neighborhood=Sphere(6),
         nruns=3, nsubjects=2
     )
-    a_clean, cluster_truth, dss = simple_sim1(
+
+    # clean case
+    signal_clean, cluster_truth, dss = simple_sim1(
         *args,
         noise_subject_std=0,
         noise_independent_std=0,
         noise_common_std=0,
         **kwargs)
+    # ,1 since we have only 1 value of dissim per each or ROIs
+    assert_equal(signal_clean.shape, (64, 64, 1))
+    # all dss should be identical to a_clean
+    for ds in dss:
+        for samples in ds[0].a.mapper.reverse(ds).samples:
+            assert_array_almost_equal(
+                signal_clean[..., 0],
+                samples)
+
+
+    # Now lets generate common noise
+    signal_clean, cluster_truth, dss = simple_sim1(
+        *args,
+        noise_subject_std=0,
+        noise_independent_std=0,
+        noise_common_std=100,
+        **kwargs)
+
+    # corr coeffs should be really high across all the runs and subjects
+    all_subj_runs = np.corrcoef(np.vstack(dss))
+    assert_true(np.all(np.abs(
+            all_subj_runs[np.triu_indices(len(all_subj_runs))])
+            > 0.8))
+    # but low to signal_clean
+    assert_true(np.all(np.abs(
+        np.corrcoef(signal_clean.flatten(), np.vstack(dss))[0, 1:]) < 0.3))
+
+
+    # Now lets generate per subject common noise
+    signal_clean, cluster_truth, dss = simple_sim1(
+        *args,
+        noise_subject_std=100,
+        noise_independent_std=0,
+        noise_common_std=0,
+        **kwargs)
+
+    # corr coeffs should be really high across all the runs within each
+    # subject but otherwise having low correlation
+    all_subj_runs = np.corrcoef(np.vstack(dss))
+    assert_true(np.all(np.abs(
+            all_subj_runs[np.triu_indices(len(all_subj_runs))])
+            > 0.8))  ## TODO: fix up
+    # and low to signal_clean
+    assert_true(np.all(np.abs(
+        np.corrcoef(signal_clean.flatten(), np.vstack(dss))[0, 1:]) < 0.3))
+
+
+    # import pylab as pl;
+    # pl.imshow(signal_clean[:, :, 0]); pl.colorbar(); pl.show()
+
+    import pdb; pdb.set_trace()
+    pass
