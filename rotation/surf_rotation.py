@@ -74,19 +74,17 @@ def barycentric_interpolation(data, xyz, xyz_rnd, i):
             the interpolated data
 
     """
-    # compute areas of the triangles that contain each rotated node
+    # get vertices that make the triangles near the rotated nodes
     a = xyz[i[:, 0]]
     b = xyz[i[:, 1]]
     c = xyz[i[:, 2]]
 
     # now compute areas of triangles
     d = xyz_rnd
-
     # vectors from vertices to point whose projection is inside the triangle
     da = d - a
     db = d - b
     dc = d - c
-
     # triangle ACD -- ratio for b
     area_acd = area_triangle_cross(da, dc)
     # triangle CBD -- ratio for a
