@@ -184,7 +184,8 @@ def compute_stability_fold(samples, train, test, method='ward',
 
 
 def compute_stability(splitter, samples, method='ward', stack=False,
-                      cv_likelihood=False, max_k=300, n_jobs=1, **kwargs):
+                      cv_likelihood=False, max_k=300, n_jobs=1,
+                      verbose=51, **kwargs):
     """
     General function to compute the stability of clustering on a list of
     datasets.
@@ -214,6 +215,9 @@ def compute_stability(splitter, samples, method='ward', stack=False,
             model; only valid if 'gmm' method is used. Default is False.
         n_jobs : int
             Number of jobs (cores) to run the algorithm on. Default is 1.
+        verbose : int
+            Level of verbosity to be passed to Parallel. Default is 51,
+            i.e. maximum verbosity.
         kwargs : optional
             Keyword arguments being passed to the clustering method (only for
             'ward' and 'gmm').
@@ -230,10 +234,10 @@ def compute_stability(splitter, samples, method='ward', stack=False,
 
     """
 
-    result = Parallel(n_jobs=n_jobs)(delayed(compute_stability_fold)
-                                     (samples, train, test, method=method,
-                                     max_k=max_k, stack=stack,
-                                     cv_likelihood=cv_likelihood,
-                                     **kwargs) for train, test in splitter)
+    result = Parallel(n_jobs=n_jobs, verbose=verbose)(delayed(
+        compute_stability_fold)(samples, train, test, method=method,
+                                max_k=max_k, stack=stack,
+                                cv_likelihood=cv_likelihood,
+                                **kwargs) for train, test in splitter)
     result = np.vstack(result)
     return result
