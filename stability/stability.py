@@ -39,7 +39,11 @@ AVAILABLE_METHODS = ['ward', 'complete', 'gmm', 'kmeans']
 
 
 def cut_tree_scipy(Y, k):
-    children = Y[:, 0:2]
+    """ Given the output Y of a hierarchical clustering solution from scipy
+    and a number k, cuts the tree and returns the labels.
+    """
+    children = Y[:, 0:2].astype(int)
+    # convert children to correct values for _hc_cut
     return _hc_cut(k, children, len(children)+1)
 
 
