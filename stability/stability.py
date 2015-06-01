@@ -48,7 +48,7 @@ def cut_tree_scipy(Y, k):
 
 
 def compute_stability_fold(samples, train, test, method='ward',
-                           max_k=300, stack=False, cv_likelihood=False,
+                           max_k=None, stack=False, cv_likelihood=False,
                            **kwargs):
     """
     General function to compute the stability on a cross-validation fold.
@@ -65,8 +65,10 @@ def compute_stability_fold(samples, train, test, method='ward',
             Indices for the test set.
         method : {'complete', 'gmm', 'kmeans', 'ward'}
             Clustering method to use. Default is 'ward'.
-        max_k : int
-            Maximum k to compute the stability testing, starting from 2.
+        max_k : int or None
+            Maximum k to compute the stability testing, starting from 2. By
+            default it will compute up to the maximum possible k, i.e.,
+            the number of points.
         stack : bool
             Whether to stack or average the datasets. Default is False,
             meaning that the datasets are averaged by default.
@@ -94,7 +96,11 @@ def compute_stability_fold(samples, train, test, method='ward',
     if cv_likelihood and method != 'gmm':
         raise ValueError(
             "Cross-validated likelihood is only available for 'gmm' method")
-    
+
+    # if max_k is None, set max_k to maximum value
+    if not max_k:
+        max_k = samples[0].shape[1]
+
     # preallocate matrix for results
     if cv_likelihood:
         result = np.zeros((max_k-1, 4))
@@ -184,7 +190,7 @@ def compute_stability_fold(samples, train, test, method='ward',
 
 
 def compute_stability(splitter, samples, method='ward', stack=False,
-                      cv_likelihood=False, max_k=300, n_jobs=1,
+                      cv_likelihood=False, max_k=None, n_jobs=1,
                       verbose=51, **kwargs):
     """
     General function to compute the stability of clustering on a list of
@@ -206,7 +212,9 @@ def compute_stability(splitter, samples, method='ward', stack=False,
         method : {'complete', 'gmm', 'kmeans', 'ward'}
             Clustering method to use. Default is 'ward'.
         max_k : int
-            Maximum k to compute the stability testing, starting from 2.
+            Maximum k to compute the stability testing, starting from 2. By
+            default it will compute up to the maximum possible k, i.e.,
+            the number of points.
         stack : bool
             Whether to stack or average the datasets. Default is False,
             meaning that the datasets are averaged by default.
