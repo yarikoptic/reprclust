@@ -7,12 +7,19 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
 Module to compute stability estimates of clustering solutions using a method
-inspired by Yeo et al. (2011). At the moment the following clustering
-algorithms are implemented:
-    - kmeans
+inspired by Yeo et al. (2011). The procedure cross-validates across
+subjects in the following way: the datasets are divided into training and
+test set; clustering is performed on the training set, and the solution is
+predicted on the test set. Then, the clustering solution is computed on the
+test set, and this is compared to the predicted one using the Adjusted Rand
+Index or the Adjusted Mutual Information as metrics. Clustering solutions
+are swept from k=2 to a maximum k defined by the user.
+
+At the moment the following clustering algorithms are implemented:
+    - k-means
     - Gaussian Mixture Models
     - Ward Clustering (structured and unstructured)
-    - complete with correlation distance
+    - complete linkage with correlation distance
 
 References:
 -----------
@@ -21,6 +28,8 @@ Hollinshead, M., et al. (2011). The organization of the human cerebral cortex
 estimated by intrinsic functional connectivity.
 Journal of Neurophysiology, 106(3), 1125–1165. doi:10.1152/jn.00338.2011
 """
+from joblib import Parallel, delayed
+
 import numpy as np
 
 from scipy.spatial.distance import pdist
@@ -33,7 +42,6 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import GMM
 from sklearn.cluster import KMeans
 
-from joblib import Parallel, delayed
 
 AVAILABLE_METHODS = ['ward', 'complete', 'gmm', 'kmeans']
 
@@ -49,7 +57,7 @@ def cut_tree_scipy(Y, k):
 
 def compute_stability_fold(samples, train, test, method='ward',
                            max_k=None, stack=False, cv_likelihood=False,
-                           **kwargs):
+                           ground_truth=None, **kwargs):
     """
     General function to compute the stability on a cross-validation fold.
     
@@ -75,21 +83,45 @@ def compute_stability_fold(samples, train, test, method='ward',
         cv_likelihood : bool
             Whether to compute the cross-validated likelihood for mixture
             model; only valid if 'gmm' method is used. Default is False.
+        ground_truth : array or None
+            Array containing the ground truth of the clustering of the data,
+            useful to compare stability against ground truth for simulations.
         kwargs : optional
             Keyword arguments being passed to the clustering method (only for
             'ward' and 'gmm').
     
     Returns:
     --------
-        result: array
-            A (max_k-1, 3) array, where result[:, 0] is the Adjusted Rand
-            Index, result[:, 1] is the Adjusted Mutual Information, and
-            result[:,  2] is the corresponding k.
-            If method is 'gmm' and cv_likelihood is True, it returns a
-            (max_k-1, 4) array, where result[:, 3] is the cross-validated
-            likelihood.
-        
-    """    
+        ks : array
+            A (max_k-1,) array, where ks[i] is the `k` of the clustering
+            solution for iteration `i`.
+        ari : array
+            A (max_k-1,) array, where ari[i] is the Adjusted Rand Index of the
+            predicted clustering solution on the test set and the actual
+            clustering solution of the test set for `k` of ks[i].
+        ami : array
+            A (max_k-1,) array, where ari[i] is the Adjusted Mutual
+            Information of the predicted clustering solution on the test set
+            and the actual clustering solution of the test set for
+            `k` of ks[i].
+        likelihood : array or None
+            If method is 'gmm' and cv_likelihood is True, a
+            (max_k-1,) array, where likelihood[i] is the cross-validated
+            likelihood of the GMM clustering solution for `k` of ks[i].
+            Otherwise returns None.
+        ari_gt : array or None
+            If ground_truth is not None, a (max_k-1,) array, where ari_gt[i]
+            is the Adjusted Rand Index of the predicted clustering solution on
+            the test set for `k` of ks[i] and the ground truth clusters of the
+            data.
+            Otherwise returns None.
+        ami_gt : array or None
+            If ground_truth is not None, a (max_k-1,) array, where ami_gt[i]
+            is the Adjusted Mutual Information of the predicted clustering
+            solution on the test set for `k` of ks[i] and the ground truth
+            clusters of the data.
+            Otherwise returns None.
+    """
     if method not in AVAILABLE_METHODS:
         raise ValueError('Method {0} not implemented'.format(method))
 
@@ -101,11 +133,12 @@ def compute_stability_fold(samples, train, test, method='ward',
     if not max_k:
         max_k = samples[0].shape[1]
 
-    # preallocate matrix for results
+    # preallocate arrays for results
+    ks = ari = ami = np.zeros(max_k-1)
     if cv_likelihood:
-        result = np.zeros((max_k-1, 4))
-    else:
-        result = np.zeros((max_k-1, 3))
+        likelihood = np.zeros(max_k-1)
+    if ground_truth is not None:
+        ari_gt = ami_gt = np.zeros(max_k-1)
 
     # get training and test
     train_set = [samples[x] for x in train]
@@ -179,14 +212,28 @@ def compute_stability_fold(samples, train, test, method='ward',
             raise ValueError("We shouldn't get here")
             
         # append results
-        result[i_k, 0] = adjusted_rand_score(prediction_label, test_label)
-        result[i_k, 1] = adjusted_mutual_info_score(prediction_label,
-                                                    test_label)
+        ks[i_k] = k
+        ari[i_k] = adjusted_rand_score(prediction_label, test_label)
+        ami[i_k] = adjusted_mutual_info_score(prediction_label, test_label)
         if cv_likelihood:
-            result[i_k, -1] = log_prob
+            likelihood[i_k] = log_prob
+        if ground_truth is not None:
+            ari_gt[i_k] = adjusted_rand_score(prediction_label, ground_truth)
+            ami_gt[i_k] = adjusted_mutual_info_score(prediction_label,
+                                                     ground_truth)
 
-    result[:, 2] = range(2, max_k+1)
-    return result
+    results = [ks, ari, ami]
+    if cv_likelihood:
+        results.append(likelihood)
+    else:
+        results.append(None)
+
+    if ground_truth is not None:
+        results += [ari_gt, ami_gt]
+    else:
+        results += [None, None]
+
+    return results
 
 
 def compute_stability(splitter, samples, method='ward', stack=False,
