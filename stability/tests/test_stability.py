@@ -25,8 +25,9 @@ def test_compute_stability_fold():
     # fake test, we should get a value of 1 for k=2
     idx_train = idx_test = range(10)
     result = compute_stability_fold(dss, idx_train, idx_test, max_k=20)
-    assert_array_equal(result[0], [1., 1., 2])
+    assert_array_equal(result[1][0], [1.])
 
+    ground_truth = np.hstack((np.zeros(10), np.ones(10)))
     # smoke test with all possible parameters
     for method in ['ward', 'complete', 'kmeans', 'gmm']:
         for stack in [True, False]:
@@ -39,5 +40,6 @@ def test_compute_stability_fold():
                 else:
                     result = compute_stability_fold(
                         dss, idx_train, idx_test, max_k=20, method=method,
-                        stack=stack, cv_likelihood=cv_likelihood)
-                    assert_true(isinstance(result, np.ndarray))
+                        stack=stack, cv_likelihood=cv_likelihood,
+                        ground_truth=ground_truth)
+                    assert_true(len(result), 6)
