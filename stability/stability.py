@@ -134,7 +134,9 @@ def compute_stability_fold(samples, train, test, method='ward',
         max_k = samples[0].shape[1]
 
     # preallocate arrays for results
-    ks = ari = ami = np.zeros(max_k-1)
+    ks = np.zeros(max_k-1, dtype=int)
+    ari = np.zeros(max_k-1)
+    ami = np.zeros(max_k-1)
     if cv_likelihood:
         likelihood = np.zeros(max_k-1)
     if ground_truth is not None:
