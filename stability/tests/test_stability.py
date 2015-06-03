@@ -7,7 +7,8 @@ from scipy.spatial.distance import pdist
 from stability.stability import (cut_tree_scipy, compute_stability_fold,
                                  get_optimal_permutation, permute,
                                  generate_random_labeling,
-                                 stability_score, norm_stability_score)
+                                 stability_score, norm_stability_score,
+                                 rand_stability_score)
 
 # create two far blobs easy to cluster
 blob1 = 2*np.random.randn(10, 2) + 100
@@ -93,14 +94,26 @@ def test_stability_score():
         assert_greater_equal(score, 0.)
 
 
+def test_rand_stability_score():
+    for i in xrange(20):
+        k = np.random.randint(2, 10)
+        n = np.random.randint(k, 20)
+        s = np.random.randint(1, 20)
+        rand_score = rand_stability_score(k, n, s)
+        assert_less_equal(rand_score, 1.)
+        assert_greater_equal(rand_score, 0.)
+
+
 def test_norm_stability_score():
     a = np.arange(9)
     b = np.arange(9)
     s = 20
-    assert_equal(norm_stability_score(a, b, s), 0)
-    assert_equal(norm_stability_score(a, b[::-1], s), 0)
+    rand_score = rand_stability_score(len(np.unique(a)), len(a), s)
+    assert_equal(norm_stability_score(a, b, rand_score), 0)
+    assert_equal(norm_stability_score(a, b[::-1], rand_score), 0)
     for i in xrange(20):
         a = generate_random_labeling(5, 10)
         b = generate_random_labeling(5, 10)
-        score = norm_stability_score(a, b, s)
+        rand_score = rand_stability_score(len(np.unique(a)), len(a), s)
+        score = norm_stability_score(a, b, rand_score)
         assert_greater_equal(score, 0.)

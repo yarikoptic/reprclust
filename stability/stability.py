@@ -353,7 +353,22 @@ def generate_random_labeling(k, size):
     return a
 
 
-def norm_stability_score(predicted_label, test_label, s):
+def rand_stability_score(k, n, s):
+    """Generates a score for random k-labellings of length n based on s
+    iterations, used as denominator to randomize the stability score
+    """
+    # get s random labelings and compute their score
+    rand_score = 0
+    for i in xrange(s):
+        # TODO: optimize this to generate fewer random labellings
+        rand_label1 = generate_random_labeling(k, n)
+        rand_label2 = generate_random_labeling(k, n)
+        rand_score += stability_score(rand_label1, rand_label2)
+    rand_score /= s
+    return rand_score
+
+
+def norm_stability_score(predicted_label, test_label, rand_score):
     """Computes the normalized stability score (see Lange) for
     `predicted_label` and  `test_label`. The stability score is normalized
     using a random labeling algorithm `R_k` (see original paper). `s` in the
@@ -362,13 +377,8 @@ def norm_stability_score(predicted_label, test_label, s):
 
     Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
     """
-    # get s random labelings and compute their score
-    rand_score = 0
-    for i in xrange(s):
-        rand_label = generate_random_labeling(len(np.unique(test_label)),
-                                              len(test_label))
-        rand_score += stability_score(rand_label, test_label)
-    rand_score /= s
-    # normalize score
+    assert 0. <= rand_score <= 1., 'rand_score of {0} is not a valid ' \
+                                   'distance'.format(rand_score)
+    # compute score and normalize it
     score = stability_score(predicted_label, test_label)/rand_score
     return score
