@@ -308,15 +308,19 @@ def compute_stability(splitter, samples, method='ward', stack=False,
     return result
 
 
-def get_optimal_permutation(a, b):
-    """Finds an optimal permutation of the elements in b to match a,
-    using the Hungarian algorithm.
+def get_optimal_permutation(a, b, k):
+    """Finds an optimal permutation `p` of the elements in b to match a,
+    using the Hungarian algorithm, such that `a ~ p(b)`. `k` specifies the
+    number of possible labels, in case they're not all present in `a` or `b`.
     """
-    w = contingency_matrix(a, b)
+    assert(a.shape == b.shape)
+    w = np.zeros((k, k), dtype=int)
+    for i, j in zip(a, b):
+        w[i, j] += 1
     # make it a cost matrix
     w = np.max(w) - w
-    # minimize the cost
-    permutation = linear_assignment(w)
+    # minimize the cost -- transpose because we want a map from `b` to `a`
+    permutation = linear_assignment(w.T)
     return permutation[:, 1]
 
 

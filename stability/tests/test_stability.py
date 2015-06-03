@@ -67,18 +67,30 @@ def test_get_optimal_permutation():
     a = np.array([0, 1, 2, 3])
     b = np.array([3, 2, 1, 0])
     perm_real = b
-    assert_array_equal(perm_real, get_optimal_permutation(a, b))
+    assert_array_equal(perm_real, get_optimal_permutation(a, b, 4))
     # no permutation
-    assert_array_equal(a, get_optimal_permutation(a, a))
-    # random perms
-    for k in xrange(20):
-        a = generate_random_labeling(5, 10)
-        perm_real = np.arange(len(np.unique(a)))
+    assert_array_equal(a, get_optimal_permutation(a, a, 4))
+    # random labellings
+    k = 5
+    for i in xrange(20):
+        # a = p(b) -- find p
+        b = generate_random_labeling(k, 10)
+        perm_real = np.arange(len(np.unique(b)))
         np.random.shuffle(perm_real)
-        b = a.copy()
-        for i in xrange(len(b)):
-            b[i] = perm_real[b[i]]
-        assert_array_equal(perm_real, get_optimal_permutation(a, b))
+        a = b.copy()
+        for j in xrange(len(a)):
+            a[j] = perm_real[a[j]]
+        assert_array_equal(perm_real, get_optimal_permutation(a, b, k))
+    # case when permutation is possible but a and b have different labels
+    a = np.array([1, 1, 2, 2, 0])
+    b = np.array([3, 3, 4, 4, 0])
+    perm = get_optimal_permutation(a, b, k)
+    assert_array_equal(perm, np.array([0, 4, 3, 1, 2]))
+
+    a = np.array([0, 0, 2, 2])
+    b = np.array([3, 3, 1, 1])
+    perm = get_optimal_permutation(a, b, 4)
+    assert_array_equal(perm, np.array([3, 2, 1, 0]))
 
 
 def test_stability_score():
