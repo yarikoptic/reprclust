@@ -24,23 +24,30 @@ At the moment the following clustering algorithms are implemented:
 References:
 -----------
 Thomas Yeo, B. T., Krienen, F. M., Sepulcre, J., Sabuncu, M. R., Lashkari, D.,
-Hollinshead, M., et al. (2011). The organization of the human cerebral cortex
-estimated by intrinsic functional connectivity.
+Hollinshead, M., et al. (2011).
+"The organization of the human cerebral cortex estimated by intrinsic
+functional connectivity."
 Journal of Neurophysiology, 106(3), 1125–1165. doi:10.1152/jn.00338.2011
+
+Lange, T., Roth, V., Braun, M. and Buhmann J. (2004)
+"Stability-based validation of clustering solutions."
+Neural computation 16, no. 6 (2004): 1299-1323.
 """
 from joblib import Parallel, delayed
 
 import numpy as np
 
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, hamming
 from scipy.cluster.hierarchy import complete
 
-from sklearn.metrics.cluster import (adjusted_rand_score,
-                                     adjusted_mutual_info_score)
-from sklearn.cluster.hierarchical import _hc_cut, ward_tree
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.mixture import GMM
 from sklearn.cluster import KMeans
+from sklearn.cluster.hierarchical import _hc_cut, ward_tree
+from sklearn.metrics.cluster import (adjusted_rand_score,
+                                     adjusted_mutual_info_score,
+                                     contingency_matrix)
+from sklearn.mixture import GMM
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.utils.linear_assignment_ import linear_assignment
 
 
 AVAILABLE_METHODS = ['ward', 'complete', 'gmm', 'kmeans']
@@ -298,3 +305,70 @@ def compute_stability(splitter, samples, method='ward', stack=False,
                                 **kwargs) for train, test in splitter)
     result = np.vstack(result)
     return result
+
+
+def get_optimal_permutation(a, b):
+    """Finds an optimal permutation of the elements in b to match a,
+    using the Hungarian algorithm.
+    """
+    w = contingency_matrix(a, b)
+    # make it a cost matrix
+    w = np.max(w) - w
+    # minimize the cost
+    permutation = linear_assignment(w)
+    return permutation[:, 1]
+
+
+def permute(b, permutation):
+    """Permutes the element in b using the mapping defined in `permutation`.
+    Value `i` in b is mapped to `permutation[i]`.
+    """
+    out = b.copy()
+    for i, el in enumerate(out):
+        out[i] = permutation[el]
+    return out
+
+
+def stability_score(predicted_label, test_label):
+    """Computes the stability score (see Lange) for `predicted_label` and
+    `test_label`.
+
+    Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
+    """
+    # find optimal permutation of labels between predicted and test
+    test_label_ = permute(test_label,
+                          get_optimal_permutation(predicted_label, test_label))
+    # return hamming distance
+    return hamming(predicted_label, test_label_)
+
+
+def generate_random_labeling(k, size):
+    """Generate a valid random labeling"""
+    if size < k:
+        raise ValueError('To have a labeling size cannot be lower than high')
+    while True:
+        a = np.random.randint(0, k, size)
+        if len(np.unique(a)) == k:
+            break
+    return a
+
+
+def norm_stability_score(predicted_label, test_label, s):
+    """Computes the normalized stability score (see Lange) for
+    `predicted_label` and  `test_label`. The stability score is normalized
+    using a random labeling algorithm `R_k` (see original paper). `s` in the
+    number of iterations of random labels to achieve an estimate of the random
+    labeling.
+
+    Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
+    """
+    # get s random labelings and compute their score
+    rand_score = 0
+    for i in xrange(s):
+        rand_label = generate_random_labeling(len(np.unique(test_label)),
+                                              len(test_label))
+        rand_score += stability_score(rand_label, test_label)
+    rand_score /= s
+    # normalize score
+    score = stability_score(predicted_label, test_label)/rand_score
+    return score
