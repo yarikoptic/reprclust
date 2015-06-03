@@ -270,8 +270,9 @@ def compute_stability_fold(samples, train, test, method='ward',
 
 
 def compute_stability(splitter, samples, method='ward', max_k=None,
-                      stack=False, cv_likelihood=False, ground_truth=None,
-                      n_neighbors=1, n_jobs=1, verbose=51, **kwargs):
+                      stack=False, stability=True, cv_likelihood=False,
+                      ground_truth=None, n_neighbors=1, rand_stab_rep=20,
+                      n_jobs=1, verbose=51, **kwargs):
     """
     General function to compute the stability of clustering on a list of
     datasets.
@@ -294,6 +295,9 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
         stack : bool
             Whether to stack or average the datasets. Default is False,
             meaning that the datasets are averaged by default.
+        stability : bool
+            Whether to compute the stability measure described in Lange et
+            al., 2004. Default is True.
         cv_likelihood : bool
             Whether to compute the cross-validated likelihood for mixture
             model; only valid if 'gmm' method is used. Default is False.
@@ -304,6 +308,9 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
             Number of neighbors to use to predict clustering solution on
             test set using K-nearest neighbors. Currently used only for
             methods `complete` and `ward`. Default is 1.
+        rand_stab_rep : int
+            Number of random labellings to be used to estimate the
+            asymptotic misclassification rate. Default is 20.
         n_jobs : int
             Number of jobs (cores) to run the algorithm on. Default is 1.
         verbose : int
@@ -327,6 +334,10 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
             Information of the predicted clustering solution on the test set
             and the actual clustering solution of the test set for
             `k` of ks[i].
+        stab : array or None
+            A (max_k-1,) array, where stab[i] is the stability measure
+            described in Lange et al., 2004 for `k` of ks[i]. Note that this
+            measure is the normalized one.
         likelihood : array or None
             If method is 'gmm' and cv_likelihood is True, a
             (max_k-1,) array, where likelihood[i] is the cross-validated
@@ -348,14 +359,17 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
 
     result = Parallel(n_jobs=n_jobs, verbose=verbose)(delayed(
         compute_stability_fold)(samples, train, test, method=method,
-                                max_k=max_k, stack=stack,
+                                max_k=max_k, stack=stack, stability=stability,
                                 cv_likelihood=cv_likelihood,
                                 ground_truth=ground_truth,
                                 n_neighbors=n_neighbors,
                                 **kwargs) for train, test in splitter)
+    # madness here to store results
+    # TODO: refactor everything to have a smarter way of doing this
     ks = []
     ari = []
     ami = []
+    stab = []
     likelihood = []
     ari_gt = []
     ami_gt = []
@@ -366,23 +380,35 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
         ami.append(r[2])
 
         if r[3] is not None:
-            likelihood.append(r[3])
+            stab.append(r[3])
+        else:
+            stab = None
+
+        if r[4] is not None:
+            likelihood.append(r[4])
         else:
             likelihood = None
 
-        if r[4] is not None:
-            ari_gt.append(r[4])
+        if r[5] is not None:
+            ari_gt.append(r[5])
         else:
             ari_gt = None
 
-        if r[5] is not None:
-            ami_gt.append(r[5])
+        if r[6] is not None:
+            ami_gt.append(r[6])
         else:
             ami_gt = None
 
     ks = np.array(ks).ravel()
     ari = np.array(ari).ravel()
     ami = np.array(ami).ravel()
+    if stab is not None:
+        stab = np.array(stab).ravel()
+        # normalize stability
+        for k in xrange(2, np.max(ks)+1):
+            rand_stab_score = rand_stability_score(k, samples[0].shape[1],
+                                                   rand_stab_rep)
+            stab[ks == k] /= rand_stab_score
     if likelihood is not None:
         likelihood = np.array(likelihood).ravel()
     if ari_gt is not None:
@@ -390,7 +416,7 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
     if ami_gt is not None:
         ami_gt = np.array(likelihood).ravel()
 
-    return ks, ari, ami, likelihood, ari_gt, ami_gt
+    return ks, ari, ami, stab, likelihood, ari_gt, ami_gt
 
 
 def get_optimal_permutation(a, b, k):
@@ -448,12 +474,14 @@ def rand_stability_score(k, n, s):
     """Generates a score for random k-labellings of length n based on s
     iterations. Used as denominator to normalize the stability score.
     """
-    # get s random labelings and compute their score
+    # get s random labellings and compute their score
     rand_score = 0
     for i in xrange(s):
         # TODO: optimize this to generate fewer random labellings
-        rand_label1 = generate_random_labeling(k, n)
-        rand_label2 = generate_random_labeling(k, n)
+        #rand_label1 = generate_random_labeling(k, n)
+        #rand_label2 = generate_random_labeling(k, n)
+        rand_label1 = np.random.randint(0, k, n)
+        rand_label2 = np.random.randint(0, k, n)
         rand_score += stability_score(rand_label1, rand_label2, k)
     rand_score /= s
     return rand_score

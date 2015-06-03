@@ -1,11 +1,11 @@
 from nose.tools import assert_equal, assert_true, assert_raises, \
-    assert_is_none, assert_is_instance
-    assert_less_equal, assert_greater_equal
+    assert_is_none, assert_is_instance, assert_less_equal, assert_greater_equal
 from numpy.testing import assert_array_equal
 import numpy as np
 from scipy.cluster.hierarchy import complete
 from scipy.spatial.distance import pdist
 from stability.stability import (cut_tree_scipy, compute_stability_fold,
+                                 compute_stability,
                                  get_optimal_permutation, permute,
                                  generate_random_labeling,
                                  stability_score, norm_stability_score,
@@ -30,11 +30,12 @@ def test_compute_stability_fold():
     dss = [(data + np.random.randn(*data.shape)).T for i in xrange(10)]
     # fake test, we should get a value of 1 for k=2
     idx_train = idx_test = range(10)
-    ks, ari, ami, likelihood, ari_gt, ami_gt = \
+    ks, ari, ami, stab, likelihood, ari_gt, ami_gt = \
         compute_stability_fold(dss, idx_train, idx_test, max_k=20)
     assert_array_equal(ks, np.arange(2, 21))
     assert_array_equal(ari, np.ones(ari.shape))
     assert_array_equal(ami, np.ones(ami.shape))
+    assert_array_equal(stab, np.zeros(stab.shape))
     assert_is_none(likelihood)
     assert_is_none(ari_gt)
     assert_is_none(ami_gt)
@@ -60,6 +61,21 @@ def test_compute_stability_fold():
                             cv_likelihood=cv_likelihood,
                             ground_truth=ground_truth)
                         assert_true(len(result), 7)
+
+
+def test_compute_stability():
+    # add some noise and transpose
+    dss = [(data + np.random.randn(*data.shape)).T for i in xrange(10)]
+    # fake test, we should get a value of 1 for k=2
+    idx_train = idx_test = range(10)
+    splitter = [(idx_train, idx_test)]
+    result = compute_stability(splitter, dss, max_k=20, stability=True,
+                               rand_stab_rep=20)
+    assert_array_equal(result[0], np.arange(2, dss[0].shape[1]+1))
+    for i in range(1, 3):
+        assert_array_equal(result[i], np.ones(result[i].shape))
+    assert_array_equal(result[3], np.zeros(result[3].shape))
+    assert_equal((None, None, None), result[4:])
 
 
 def test_generate_random_labeling():
