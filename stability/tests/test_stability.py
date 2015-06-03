@@ -124,12 +124,12 @@ def test_get_optimal_permutation():
 def test_stability_score():
     a = np.arange(9)
     b = np.arange(9)
-    assert_equal(stability_score(a, b), 0)
-    assert_equal(stability_score(a, b[::-1]), 0)
+    assert_equal(stability_score(a, b, 9), 0)
+    assert_equal(stability_score(a, b[::-1], 9), 0)
     for i in xrange(20):
         a = generate_random_labeling(5, 10)
         b = generate_random_labeling(5, 10)
-        score = stability_score(a, b)
+        score = stability_score(a, b, 10)
         assert_less_equal(score, 1.)
         assert_greater_equal(score, 0.)
 
@@ -149,11 +149,11 @@ def test_norm_stability_score():
     b = np.arange(9)
     s = 20
     rand_score = rand_stability_score(len(np.unique(a)), len(a), s)
-    assert_equal(norm_stability_score(a, b, rand_score), 0)
-    assert_equal(norm_stability_score(a, b[::-1], rand_score), 0)
+    assert_equal(norm_stability_score(a, b, rand_score, 9), 0)
+    assert_equal(norm_stability_score(a, b[::-1], rand_score, 9), 0)
     for i in xrange(20):
         a = generate_random_labeling(5, 10)
         b = generate_random_labeling(5, 10)
         rand_score = rand_stability_score(len(np.unique(a)), len(a), s)
-        score = norm_stability_score(a, b, rand_score)
+        score = norm_stability_score(a, b, rand_score, 10)
         assert_greater_equal(score, 0.)
