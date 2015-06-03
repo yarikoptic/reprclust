@@ -147,7 +147,8 @@ def compute_stability_fold(samples, train, test, method='ward',
     if cv_likelihood:
         likelihood = np.zeros(max_k-1)
     if ground_truth is not None:
-        ari_gt = ami_gt = np.zeros(max_k-1)
+        ari_gt = np.zeros(max_k-1)
+        ami_gt = np.zeros(max_k-1)
 
     # get training and test
     train_set = [samples[x] for x in train]
