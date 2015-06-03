@@ -57,7 +57,7 @@ def cut_tree_scipy(Y, k):
 
 def compute_stability_fold(samples, train, test, method='ward',
                            max_k=None, stack=False, cv_likelihood=False,
-                           ground_truth=None, **kwargs):
+                           ground_truth=None, n_neighbors=1, **kwargs):
     """
     General function to compute the stability on a cross-validation fold.
     
@@ -86,6 +86,10 @@ def compute_stability_fold(samples, train, test, method='ward',
         ground_truth : array or None
             Array containing the ground truth of the clustering of the data,
             useful to compare stability against ground truth for simulations.
+        n_neighbors : int
+            Number of neighbors to use to predict clustering solution on
+            test set using K-nearest neighbors. Currently used only for
+            methods `complete` and `ward`. Default is 1.
         kwargs : optional
             Keyword arguments being passed to the clustering method (only for
             'ward' and 'gmm').
@@ -179,7 +183,9 @@ def compute_stability_fold(samples, train, test, method='ward',
             train_label = cut_tree_scipy(Y_train, k)
             test_label = cut_tree_scipy(Y_test, k)
             # train a classifier on this clustering
-            knn = KNeighborsClassifier(algorithm='brute', metric='correlation')
+            knn = KNeighborsClassifier(#algorithm='brute',
+            # metric='correlation',
+                                       n_neighbors=n_neighbors)
             knn.fit(train_ds.T, train_label)
             # predict the clusters in the test set
             prediction_label = knn.predict(test_ds.T)
@@ -188,7 +194,7 @@ def compute_stability_fold(samples, train, test, method='ward',
             train_label = _hc_cut(k, children_train, n_leaves_train)
             test_label = _hc_cut(k, children_test, n_leaves_test)
             # train a classifier on this clustering
-            knn = KNeighborsClassifier()
+            knn = KNeighborsClassifier(n_neighbors=n_neighbors)
             knn.fit(train_ds.T, train_label)
             # predict the clusters in the test set
             prediction_label = knn.predict(test_ds.T)
@@ -203,7 +209,7 @@ def compute_stability_fold(samples, train, test, method='ward',
             gmm.fit(test_ds.T)
             test_label = gmm.predict(test_ds.T)
         elif method == 'kmeans':
-            kmeans = KMeans(n_clusters=k, **kwargs)
+            kmeans = KMeans(n_clusters=k)
             # fit on train and predict test
             kmeans.fit(train_ds.T)
             prediction_label = kmeans.predict(test_ds.T)
@@ -238,9 +244,9 @@ def compute_stability_fold(samples, train, test, method='ward',
     return results
 
 
-def compute_stability(splitter, samples, method='ward', stack=False,
-                      cv_likelihood=False, max_k=None, n_jobs=1,
-                      verbose=51, **kwargs):
+def compute_stability(splitter, samples, method='ward', max_k=None,
+                      stack=False, cv_likelihood=False, ground_truth=None,
+                      n_neighbors=1, n_jobs=1, verbose=51, **kwargs):
     """
     General function to compute the stability of clustering on a list of
     datasets.
@@ -254,13 +260,9 @@ def compute_stability(splitter, samples, method='ward', stack=False,
             List of arrays containing the samples to cluster, each
             array has shape (n_samples, n_features) in PyMVPA terminology.
             We are clustering the features, i.e., the nodes.
-        train : list or array
-            Indices for the training set.
-        test : list or array
-            Indices for the test set.
         method : {'complete', 'gmm', 'kmeans', 'ward'}
             Clustering method to use. Default is 'ward'.
-        max_k : int
+        max_k : int or None
             Maximum k to compute the stability testing, starting from 2. By
             default it will compute up to the maximum possible k, i.e.,
             the number of points.
@@ -270,6 +272,13 @@ def compute_stability(splitter, samples, method='ward', stack=False,
         cv_likelihood : bool
             Whether to compute the cross-validated likelihood for mixture
             model; only valid if 'gmm' method is used. Default is False.
+        ground_truth : array or None
+            Array containing the ground truth of the clustering of the data,
+            useful to compare stability against ground truth for simulations.
+        n_neighbors : int
+            Number of neighbors to use to predict clustering solution on
+            test set using K-nearest neighbors. Currently used only for
+            methods `complete` and `ward`. Default is 1.
         n_jobs : int
             Number of jobs (cores) to run the algorithm on. Default is 1.
         verbose : int
@@ -281,20 +290,79 @@ def compute_stability(splitter, samples, method='ward', stack=False,
 
     Returns:
     --------
-        result: array
-            A (max_k-1, 3) array, where result[:, 0] is the Adjusted Rand
-            Index, result[:, 1] is the Adjusted Mutual Information, and
-            result[:,  2] is the corresponding k.
-            If method is 'gmm' and cv_likelihood is True, it returns a
-            (max_k-1, 4) array, where result[:, 3] is the cross-validated
-            likelihood.
-
+        ks : array
+            A (max_k-1,) array, where ks[i] is the `k` of the clustering
+            solution for iteration `i`.
+        ari : array
+            A (max_k-1,) array, where ari[i] is the Adjusted Rand Index of the
+            predicted clustering solution on the test set and the actual
+            clustering solution of the test set for `k` of ks[i].
+        ami : array
+            A (max_k-1,) array, where ari[i] is the Adjusted Mutual
+            Information of the predicted clustering solution on the test set
+            and the actual clustering solution of the test set for
+            `k` of ks[i].
+        likelihood : array or None
+            If method is 'gmm' and cv_likelihood is True, a
+            (max_k-1,) array, where likelihood[i] is the cross-validated
+            likelihood of the GMM clustering solution for `k` of ks[i].
+            Otherwise returns None.
+        ari_gt : array or None
+            If ground_truth is not None, a (max_k-1,) array, where ari_gt[i]
+            is the Adjusted Rand Index of the predicted clustering solution on
+            the test set for `k` of ks[i] and the ground truth clusters of the
+            data.
+            Otherwise returns None.
+        ami_gt : array or None
+            If ground_truth is not None, a (max_k-1,) array, where ami_gt[i]
+            is the Adjusted Mutual Information of the predicted clustering
+            solution on the test set for `k` of ks[i] and the ground truth
+            clusters of the data.
+            Otherwise returns None.
     """
 
     result = Parallel(n_jobs=n_jobs, verbose=verbose)(delayed(
         compute_stability_fold)(samples, train, test, method=method,
                                 max_k=max_k, stack=stack,
                                 cv_likelihood=cv_likelihood,
+                                ground_truth=ground_truth,
+                                n_neighbors=n_neighbors,
                                 **kwargs) for train, test in splitter)
-    result = np.vstack(result)
-    return result
+    ks = []
+    ari = []
+    ami = []
+    likelihood = []
+    ari_gt = []
+    ami_gt = []
+
+    for r in result:
+        ks.append(r[0])
+        ari.append(r[1])
+        ami.append(r[2])
+
+        if r[3] is not None:
+            likelihood.append(r[3])
+        else:
+            likelihood = None
+
+        if r[4] is not None:
+            ari_gt.append(r[4])
+        else:
+            ari_gt = None
+
+        if r[5] is not None:
+            ami_gt.append(r[5])
+        else:
+            ami_gt = None
+
+    ks = np.array(ks).ravel()
+    ari = np.array(ari).ravel()
+    ami = np.array(ami).ravel()
+    if likelihood is not None:
+        likelihood = np.array(likelihood).ravel()
+    if ari_gt is not None:
+        ari_gt = np.array(likelihood).ravel()
+    if ami_gt is not None:
+        ami_gt = np.array(likelihood).ravel()
+
+    return ks, ari, ami, likelihood, ari_gt, ami_gt
