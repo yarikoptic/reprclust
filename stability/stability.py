@@ -24,23 +24,30 @@ At the moment the following clustering algorithms are implemented:
 References:
 -----------
 Thomas Yeo, B. T., Krienen, F. M., Sepulcre, J., Sabuncu, M. R., Lashkari, D.,
-Hollinshead, M., et al. (2011). The organization of the human cerebral cortex
-estimated by intrinsic functional connectivity.
+Hollinshead, M., et al. (2011).
+"The organization of the human cerebral cortex estimated by intrinsic
+functional connectivity."
 Journal of Neurophysiology, 106(3), 1125–1165. doi:10.1152/jn.00338.2011
+
+Lange, T., Roth, V., Braun, M. and Buhmann J. (2004)
+"Stability-based validation of clustering solutions."
+Neural computation 16, no. 6 (2004): 1299-1323.
 """
 from joblib import Parallel, delayed
 
 import numpy as np
 
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, hamming
 from scipy.cluster.hierarchy import complete
 
-from sklearn.metrics.cluster import (adjusted_rand_score,
-                                     adjusted_mutual_info_score)
-from sklearn.cluster.hierarchical import _hc_cut, ward_tree
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.mixture import GMM
 from sklearn.cluster import KMeans
+from sklearn.cluster.hierarchical import _hc_cut, ward_tree
+from sklearn.metrics.cluster import (adjusted_rand_score,
+                                     adjusted_mutual_info_score,
+                                     contingency_matrix)
+from sklearn.mixture import GMM
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.utils.linear_assignment_ import linear_assignment
 
 
 AVAILABLE_METHODS = ['ward', 'complete', 'gmm', 'kmeans']
@@ -56,8 +63,9 @@ def cut_tree_scipy(Y, k):
 
 
 def compute_stability_fold(samples, train, test, method='ward',
-                           max_k=None, stack=False, cv_likelihood=False,
-                           ground_truth=None, n_neighbors=1, **kwargs):
+                           max_k=None, stack=False,
+                           stability=True, cv_likelihood=False,
+                           ground_truth=None, n_neighbors=1,  **kwargs):
     """
     General function to compute the stability on a cross-validation fold.
     
@@ -80,6 +88,9 @@ def compute_stability_fold(samples, train, test, method='ward',
         stack : bool
             Whether to stack or average the datasets. Default is False,
             meaning that the datasets are averaged by default.
+        stability : bool
+            Whether to compute the stability measure described in Lange et
+            al., 2004. Default is True.
         cv_likelihood : bool
             Whether to compute the cross-validated likelihood for mixture
             model; only valid if 'gmm' method is used. Default is False.
@@ -108,6 +119,11 @@ def compute_stability_fold(samples, train, test, method='ward',
             Information of the predicted clustering solution on the test set
             and the actual clustering solution of the test set for
             `k` of ks[i].
+        stab : array or None
+            A (max_k-1,) array, where stab[i] is the stability measure
+            described in Lange et al., 2004 for `k` of ks[i]. Note that this
+            measure is the un-normalized one. It will be normalized later in
+            the process.
         likelihood : array or None
             If method is 'gmm' and cv_likelihood is True, a
             (max_k-1,) array, where likelihood[i] is the cross-validated
@@ -141,10 +157,13 @@ def compute_stability_fold(samples, train, test, method='ward',
     ks = np.zeros(max_k-1, dtype=int)
     ari = np.zeros(max_k-1)
     ami = np.zeros(max_k-1)
+    if stability:
+        stab = np.zeros(max_k-1)
     if cv_likelihood:
         likelihood = np.zeros(max_k-1)
     if ground_truth is not None:
-        ari_gt = ami_gt = np.zeros(max_k-1)
+        ari_gt = np.zeros(max_k-1)
+        ami_gt = np.zeros(max_k-1)
 
     # get training and test
     train_set = [samples[x] for x in train]
@@ -223,6 +242,8 @@ def compute_stability_fold(samples, train, test, method='ward',
         ks[i_k] = k
         ari[i_k] = adjusted_rand_score(prediction_label, test_label)
         ami[i_k] = adjusted_mutual_info_score(prediction_label, test_label)
+        if stability:
+            stab[i_k] = stability_score(prediction_label, test_label, k)
         if cv_likelihood:
             likelihood[i_k] = log_prob
         if ground_truth is not None:
@@ -231,6 +252,10 @@ def compute_stability_fold(samples, train, test, method='ward',
                                                      ground_truth)
 
     results = [ks, ari, ami]
+    if stability:
+        results.append(stab)
+    else:
+        results.append(None)
     if cv_likelihood:
         results.append(likelihood)
     else:
@@ -366,3 +391,83 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
         ami_gt = np.array(likelihood).ravel()
 
     return ks, ari, ami, likelihood, ari_gt, ami_gt
+
+
+def get_optimal_permutation(a, b, k):
+    """Finds an optimal permutation `p` of the elements in b to match a,
+    using the Hungarian algorithm, such that `a ~ p(b)`. `k` specifies the
+    number of possible labels, in case they're not all present in `a` or `b`.
+    """
+    assert(a.shape == b.shape)
+    w = np.zeros((k, k), dtype=int)
+    for i, j in zip(a, b):
+        w[i, j] += 1
+    # make it a cost matrix
+    w = np.max(w) - w
+    # minimize the cost -- transpose because we want a map from `b` to `a`
+    permutation = linear_assignment(w.T)
+    return permutation[:, 1]
+
+
+def permute(b, permutation):
+    """Permutes the element in b using the mapping defined in `permutation`.
+    Value `i` in b is mapped to `permutation[i]`.
+    """
+    out = b.copy()
+    for i, el in enumerate(out):
+        out[i] = permutation[el]
+    return out
+
+
+def stability_score(predicted_label, test_label, k):
+    """Computes the stability score (see Lange) for `predicted_label` and
+    `test_label` assuming `k` possible labels.
+
+    Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
+    """
+    # find optimal permutation of labels between predicted and test
+    test_label_ = permute(test_label,
+                          get_optimal_permutation(predicted_label,
+                                                  test_label, k))
+    # return hamming distance
+    return hamming(predicted_label, test_label_)
+
+
+def generate_random_labeling(k, size):
+    """Generate a valid random labeling"""
+    if size < k:
+        raise ValueError('To have a labeling size cannot be lower than high')
+    while True:
+        a = np.random.randint(0, k, size)
+        if len(np.unique(a)) == k:
+            break
+    return a
+
+
+def rand_stability_score(k, n, s):
+    """Generates a score for random k-labellings of length n based on s
+    iterations. Used as denominator to normalize the stability score.
+    """
+    # get s random labelings and compute their score
+    rand_score = 0
+    for i in xrange(s):
+        # TODO: optimize this to generate fewer random labellings
+        rand_label1 = generate_random_labeling(k, n)
+        rand_label2 = generate_random_labeling(k, n)
+        rand_score += stability_score(rand_label1, rand_label2, k)
+    rand_score /= s
+    return rand_score
+
+
+def norm_stability_score(predicted_label, test_label, rand_score, k):
+    """Computes the normalized stability score (see Lange) for
+    `predicted_label` and  `test_label`. The stability score is normalized
+    using a random labeling algorithm `R_k` (see original paper).
+
+    Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
+    """
+    assert 0. <= rand_score <= 1., 'rand_score of {0} is not a valid ' \
+                                   'distance'.format(rand_score)
+    # compute score and normalize it
+    score = stability_score(predicted_label, test_label, k)/rand_score
+    return score
