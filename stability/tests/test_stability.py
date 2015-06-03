@@ -37,17 +37,22 @@ def test_compute_stability_fold():
     for method in ['ward', 'complete', 'kmeans', 'gmm']:
         for stack in [True, False]:
             for cv_likelihood in [True, False]:
-                if cv_likelihood and method != 'gmm':
-                    assert_raises(ValueError, compute_stability_fold,
-                                  dss, idx_train, idx_test,
-                                  max_k=20, method=method,
-                                  stack=stack, cv_likelihood=cv_likelihood)
-                else:
-                    result = compute_stability_fold(
-                        dss, idx_train, idx_test, max_k=20, method=method,
-                        stack=stack, cv_likelihood=cv_likelihood,
-                        ground_truth=ground_truth)
-                    assert_true(len(result), 6)
+                for stability in [True, False]:
+                    if cv_likelihood and method != 'gmm':
+                        assert_raises(ValueError, compute_stability_fold,
+                                      dss, idx_train, idx_test,
+                                      max_k=20, method=method,
+                                      stack=stack,
+                                      stability=stability,
+                                      cv_likelihood=cv_likelihood)
+                    else:
+                        result = compute_stability_fold(
+                            dss, idx_train, idx_test, max_k=20, method=method,
+                            stack=stack,
+                            stability=stability,
+                            cv_likelihood=cv_likelihood,
+                            ground_truth=ground_truth)
+                        assert_true(len(result), 7)
 
 
 def test_generate_random_labeling():

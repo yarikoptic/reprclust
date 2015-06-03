@@ -63,7 +63,8 @@ def cut_tree_scipy(Y, k):
 
 
 def compute_stability_fold(samples, train, test, method='ward',
-                           max_k=None, stack=False, cv_likelihood=False,
+                           max_k=None, stack=False,
+                           stability=True, cv_likelihood=False,
                            ground_truth=None, **kwargs):
     """
     General function to compute the stability on a cross-validation fold.
@@ -87,6 +88,9 @@ def compute_stability_fold(samples, train, test, method='ward',
         stack : bool
             Whether to stack or average the datasets. Default is False,
             meaning that the datasets are averaged by default.
+        stability : bool
+            Whether to compute the stability measure described in Lange et
+            al., 2004. Default is True.
         cv_likelihood : bool
             Whether to compute the cross-validated likelihood for mixture
             model; only valid if 'gmm' method is used. Default is False.
@@ -111,6 +115,11 @@ def compute_stability_fold(samples, train, test, method='ward',
             Information of the predicted clustering solution on the test set
             and the actual clustering solution of the test set for
             `k` of ks[i].
+        stab : array or None
+            A (max_k-1,) array, where stab[i] is the stability measure
+            described in Lange et al., 2004 for `k` of ks[i]. Note that this
+            measure is the un-normalized one. It will be normalized later in
+            the process.
         likelihood : array or None
             If method is 'gmm' and cv_likelihood is True, a
             (max_k-1,) array, where likelihood[i] is the cross-validated
@@ -144,6 +153,8 @@ def compute_stability_fold(samples, train, test, method='ward',
     ks = np.zeros(max_k-1, dtype=int)
     ari = np.zeros(max_k-1)
     ami = np.zeros(max_k-1)
+    if stability:
+        stab = np.zeros(max_k-1)
     if cv_likelihood:
         likelihood = np.zeros(max_k-1)
     if ground_truth is not None:
@@ -225,6 +236,8 @@ def compute_stability_fold(samples, train, test, method='ward',
         ks[i_k] = k
         ari[i_k] = adjusted_rand_score(prediction_label, test_label)
         ami[i_k] = adjusted_mutual_info_score(prediction_label, test_label)
+        if stability:
+            stab[i_k] = stability_score(prediction_label, test_label, k)
         if cv_likelihood:
             likelihood[i_k] = log_prob
         if ground_truth is not None:
@@ -233,6 +246,10 @@ def compute_stability_fold(samples, train, test, method='ward',
                                                      ground_truth)
 
     results = [ks, ari, ami]
+    if stability:
+        results.append(stab)
+    else:
+        results.append(None)
     if cv_likelihood:
         results.append(likelihood)
     else:
@@ -334,15 +351,16 @@ def permute(b, permutation):
     return out
 
 
-def stability_score(predicted_label, test_label):
+def stability_score(predicted_label, test_label, k):
     """Computes the stability score (see Lange) for `predicted_label` and
-    `test_label`.
+    `test_label` assuming `k` possible labels.
 
     Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
     """
     # find optimal permutation of labels between predicted and test
     test_label_ = permute(test_label,
-                          get_optimal_permutation(predicted_label, test_label))
+                          get_optimal_permutation(predicted_label,
+                                                  test_label, k))
     # return hamming distance
     return hamming(predicted_label, test_label_)
 
@@ -360,7 +378,7 @@ def generate_random_labeling(k, size):
 
 def rand_stability_score(k, n, s):
     """Generates a score for random k-labellings of length n based on s
-    iterations, used as denominator to randomize the stability score
+    iterations. Used as denominator to normalize the stability score.
     """
     # get s random labelings and compute their score
     rand_score = 0
@@ -368,22 +386,20 @@ def rand_stability_score(k, n, s):
         # TODO: optimize this to generate fewer random labellings
         rand_label1 = generate_random_labeling(k, n)
         rand_label2 = generate_random_labeling(k, n)
-        rand_score += stability_score(rand_label1, rand_label2)
+        rand_score += stability_score(rand_label1, rand_label2, k)
     rand_score /= s
     return rand_score
 
 
-def norm_stability_score(predicted_label, test_label, rand_score):
+def norm_stability_score(predicted_label, test_label, rand_score, k):
     """Computes the normalized stability score (see Lange) for
     `predicted_label` and  `test_label`. The stability score is normalized
-    using a random labeling algorithm `R_k` (see original paper). `s` in the
-    number of iterations of random labels to achieve an estimate of the random
-    labeling.
+    using a random labeling algorithm `R_k` (see original paper).
 
     Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
     """
     assert 0. <= rand_score <= 1., 'rand_score of {0} is not a valid ' \
                                    'distance'.format(rand_score)
     # compute score and normalize it
-    score = stability_score(predicted_label, test_label)/rand_score
+    score = stability_score(predicted_label, test_label, k)/rand_score
     return score
