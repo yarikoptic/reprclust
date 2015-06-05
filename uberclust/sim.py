@@ -82,6 +82,7 @@ def get_intrinsic_noises(shape, std, sigma, n=1):
     return [filter_each_2d(np.random.normal(size=shape)*std, sigma)
             for i in xrange(n)]
 
+
 def generate_mixins(npoints):
     """Generate random mixins with some coloring and offset"""
     data = np.random.normal(size=npoints)
@@ -92,7 +93,8 @@ def generate_mixins(npoints):
     data_filtered = np.convolve(data, kernel)[:len(data)] + np.random.normal()
     return data_filtered
 
-def simple_sim1(shape, dissims,
+
+def simple_sim1(shape, sims,
                 rois_arrangement='circle',
                 roi_neighborhood=Sphere(5),
                 nruns=1, nsubjects=1,
@@ -141,19 +143,10 @@ def simple_sim1(shape, dissims,
     TODO: now mix-in happens with purely normal random weights,  ideally we
     should color those as well
     """
-    ndissims = len(dissims)
-
-    # first we fisher transform so we can add normal noise
-    # check first that we don't have extreme values that might give infinity
-    dissims = np.array(dissims)
-    dissims = 1. - dissims
-    dissims[dissims==1] = 0.99
-    dissims[dissims==-1] = -0.99
-    # fisher
-    dissims = np.arctanh(dissims)
+    nsims = len(sims)
 
     # generate target clean "picture"
-    d = np.asanyarray(dissims[0])
+    d = np.asanyarray(sims[0])
     signal_clean = np.zeros(shape + (len(vector_form(d)),))
 
     # generate ground truth for clustering
@@ -163,8 +156,8 @@ def simple_sim1(shape, dissims,
         radius = min(shape[:2])/4.
         center = np.array((radius*2,) * len(shape)).astype(int)
         # arrange at quarter distance from center
-        for i, dissim in enumerate(dissims):
-            dissim = vector_form(dissim)
+        for i, sim in enumerate(sims):
+            sim = vector_form(sim)
             # that is kinda boring -- the same dissimilarity to each
             # voxel???
             #
@@ -173,13 +166,13 @@ def simple_sim1(shape, dissims,
             # dissimilarity (not exactly but at least close).  That
             # would make more sense
             roi_center = center.copy()
-            roi_center[0] += int(radius * np.cos(2*np.pi*i/ndissims))
-            roi_center[1] += int(radius * np.sin(2*np.pi*i/ndissims))
+            roi_center[0] += int(radius * np.cos(2*np.pi*i/nsims))
+            roi_center[1] += int(radius * np.sin(2*np.pi*i/nsims))
             for coords in roi_neighborhood(roi_center):
                 acoords = np.asanyarray(coords)
                 if np.all(acoords >= [0]*len(coords)) and \
                    np.all(acoords < signal_clean.shape[:len(coords)]):
-                    signal_clean.__setitem__(coords, dissim)
+                    signal_clean.__setitem__(coords, sim)
                     cluster_truth.__setitem__(coords, i+1)
     else:
         raise ValueError("I know only circle")
@@ -228,12 +221,10 @@ def simple_sim1(shape, dissims,
                 np.random.normal(size=signal_clean.shape)*noise_independent_std,
                 noise_independent_smooth)
 
-            # go back to correlations with inverse of fisher
-            signal_run = np.tanh(signal_run)
             # rollaxis to bring similarities into leading dimension
             ds = Dataset(np.rollaxis(signal_run, 2, 0))
             ds.sa['chunks'] = [run]
-            ds.sa['dissimilarity'] = np.arange(len(dissim))  # Lame one for now
+            ds.sa['dissimilarity'] = np.arange(len(sim))  # Lame one for now
             ds_flat = ds.get_mapped(FlattenMapper(shape=ds.shape[1:],
                                                   space='pixel_indices'))
             dss_subject.append(ds_flat)
@@ -246,9 +237,10 @@ def simple_sim1(shape, dissims,
     # Instrumental noise -- the most banal
     assert(len(dss) == nsubjects)
     assert(len(dss) == nsubjects)
-    assert(len(dss[0]) == nruns*len(dissim))
+    assert(len(dss[0]) == nruns*len(sim))
 
-    return np.tanh(signal_clean), cluster_truth, dss
+    return signal_clean, cluster_truth, dss
+
 
 if __name__ == '__main__':
     a_clean, cluster_truth, dss = simple_sim1(
