@@ -125,6 +125,7 @@ def test_stability_score():
     a = np.arange(9)
     b = np.arange(9)
     assert_equal(stability_score(a, b, 9), 0)
+    assert_equal(stability_score(a, b, 9), stability_score(b, a, 9))
     assert_equal(stability_score(a, b[::-1], 9), 0)
     for i in xrange(20):
         a = generate_random_labeling(5, 10)
@@ -132,6 +133,8 @@ def test_stability_score():
         score = stability_score(a, b, 10)
         assert_less_equal(score, 1.)
         assert_greater_equal(score, 0.)
+        # test it's symmetric
+        assert_equal(score, stability_score(b, a, 10))
 
 
 def test_rand_stability_score():

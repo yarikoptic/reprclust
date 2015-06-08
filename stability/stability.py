@@ -448,8 +448,6 @@ def permute(b, permutation):
 def stability_score(predicted_label, test_label, k):
     """Computes the stability score (see Lange) for `predicted_label` and
     `test_label` assuming `k` possible labels.
-
-    Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
     """
     # find optimal permutation of labels between predicted and test
     test_label_ = permute(test_label,
@@ -491,8 +489,6 @@ def norm_stability_score(predicted_label, test_label, rand_score, k):
     """Computes the normalized stability score (see Lange) for
     `predicted_label` and  `test_label`. The stability score is normalized
     using a random labeling algorithm `R_k` (see original paper).
-
-    Note: order of the inputs matters: S(predicted, test) != S(test, predicted)
     """
     assert 0. <= rand_score <= 1., 'rand_score of {0} is not a valid ' \
                                    'distance'.format(rand_score)
