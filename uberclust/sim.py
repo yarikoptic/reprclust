@@ -97,10 +97,40 @@ def generate_mixins(npoints):
     return data_filtered
 
 
-def simple_sim1(shape, sims,
+def get_pattern_from_dissim(dissim, ndim=None, metric="euclidean"):
+    """Generate a pattern fulfilling original dissimilarity
+
+    Parameters
+    ----------
+    dissim : np.ndarray
+      Dissimilarity
+    ndim : int, optional
+      target dimensionality
+    metric : { 'euclidean' } # OTHERS TODO
+    """
+    dissim = np.asanyarray(dissim)
+    if metric == 'euclidean':
+        # Generate a pattern which would carry necessary similarity
+        mds_pattern = mds_classical(dissim, ndim=-1)
+        if not ndim:
+            ndim = mds_pattern.shape[1]
+        else:
+            # we might need to subselect necessary number of leading dimensions
+            mds_pattern = mds_pattern[:, :ndim]
+        # and rotate it within the ROI
+        ptrns = np.dot(mds_pattern,
+                       get_random_rotation(mds_pattern.shape[1], ndim))
+        return np.atleast_2d(ptrns)
+    else:
+        raise NotImplementedError("Don't know yet how to generate for %r metric"
+                                  % metric)
+
+
+def simple_sim1(shape, dissims,
                 rois_arrangement='circle',
                 roi_neighborhood=Sphere(5),
-                nruns=1, nsubjects=1,
+                dissim_metric='euclidean',
+                nruns=1, nsubjects=1, targets=None,
                 # noise components -- we just add normal for now also with
                 # spatial smoothing to possibly create difference in noise
                 # characteristics across different kinds
@@ -119,7 +149,7 @@ def simple_sim1(shape, sims,
                 # since it would not be representative of the original signal
                 noise_common_n=1, noise_common_std=0.4, noise_common_smooth=2.
                 ):
-    """Simulate "data" based on similarity/clusters structure
+    """Simulate "data" based on dissimilarity/clusters structure
 
     Simulated data (multiple runs per subject) will contain spatial patterns which
     in each cluster has target similarity structure (per each trial), and 3 noise
@@ -152,14 +182,16 @@ def simple_sim1(shape, sims,
 
     shape : tuple (int, int)
       shape of 2d "voxel space"
-    sims : list of ndarray
-      list of similarities per each cluster/roi. Similarities could be presented
-      as vectors (upper triang elements) or full matrices of similarities
+    dissims : list of ndarray
+      list of dissimilarities per each cluster/roi. Dissimilarities could be presented
+      as vectors (upper triang elements) or full matrices of dissimilarities
     rois_arrangement : {'circle',}
       how to arrange clusters
     roi_neighborhood :
       neighborhood defining clusters
     nruns, nsubjects : int
+    targets : list of string, optional
+      Targets to assign (corresponding to dissims)
     noise_independent_std, noise_independent_smooth:
       characteristics of noise independent of each subject/sample
       (i.e. Instrumental noise like)
@@ -180,18 +212,19 @@ def simple_sim1(shape, sims,
     signal_clean, cluster_truth, dss
     """
 
-    for i, sim in enumerate(sims):
-        if sims.ndim == 1:
-            sims = squareform(sims)
-            sims[i] = sim # replace them all with square version
-        assert(sim.shape[0] == sim.shape[1])
-    sims = np.asanyarray(sims)
-    nrois = len(sims)      # number of ROIs
-    ncats = sims.shape[1]  # number of categories
+    for i, dissim in enumerate(dissims):
+        dissim = np.asanyarray(dissim)
+        if dissim.ndim == 1:
+            dissim = squareform(dissim)
+        dissims[i] = dissim # replace them all with square version
+        assert(dissim.shape[0] == dissim.shape[1])
+    dissims = np.asanyarray(dissims)
+    nrois = len(dissims)      # number of ROIs
+    ncats = dissims.shape[1]  # number of categories
 
     # generate target clean "picture" per each subject/run
     # ncats x shape
-    #d = np.asanyarray(sims[0])
+    #d = np.asanyarray(dissims[0])
     signal_clean = np.zeros((ncats,) + shape)
 
     # generate ground truth for clustering
@@ -201,7 +234,7 @@ def simple_sim1(shape, sims,
         radius = min(shape[:2])/4.
         center = np.array((radius*2,) * len(shape)).astype(int)
         # arrange at quarter distance from center
-        for i, sim in enumerate(sims):
+        for i, dissim in enumerate(dissims):
             # that is kinda boring -- the same dissimilarity to each
             # voxel???
             #
@@ -215,24 +248,30 @@ def simple_sim1(shape, sims,
             roi_coords = roi_neighborhood(roi_center)
 
             # filter those out which are outside of our space
-            def in_box(coord):
+            def in_box(coords):
                 acoords = np.asanyarray(coords)
                 return np.all(acoords >= [0]*len(coords)) and \
-                       np.all(acoords < signal_clean.shape[:len(coords)])
-            coords = filter(in_box, coords)
-            npoints = len(coords)
+                       np.all(acoords < signal_clean.shape[1:])
 
-            # Generate a pattern which would carry necessary similarity
-            mds_pattern = mds(sim, ndim=-1)
-            # and rotate it within the ROI
-            points_2 = np.dot(mds(sim, ndim=-1), get_random_rotation(nd, npoints))
+            roi_coords = filter(in_box, roi_coords)
+            npoints = len(roi_coords)
 
+            pattern = get_pattern_from_dissim(
+                dissim, ndim=npoints, metric=dissim_metric)
+            # TODO  tricky part here -- I thought to normalize the "signal" pattern
+            # for the unit variance so noise std would be easier to comprehend
+            # But in case of euclidean distance we shouldn't change (by default) the
+            # scale anyhow if we want to really have it.  BUT that somewhat ruins
+            # balancing between ROIs of different sizes etc
 
-            for coords in roi_coords:
+            # TODO: do proper numpy way
+
+            for i, coords in enumerate(roi_coords):
+                # for indexing within array
                 acoords = np.asanyarray(coords)
-                if :
-                    signal_clean.__setitem__(coords, sim)
-                    cluster_truth.__setitem__(coords, i+1)
+                for signal_clean_, pattern_ in zip(signal_clean, pattern):
+                    signal_clean_.__setitem__(acoords, pattern_[i])
+                cluster_truth.__setitem__(acoords, i+1)
     else:
         raise ValueError("I know only circle")
 
@@ -280,8 +319,8 @@ def simple_sim1(shape, sims,
                 np.random.normal(size=signal_clean.shape)*noise_independent_std,
                 noise_independent_smooth)
 
-            # rollaxis to bring similarities into leading dimension
-            ds = Dataset(np.rollaxis(signal_run, 2, 0))
+            ## rollaxis to bring similarities into leading dimension
+            ds = Dataset(signal_run) # np.rollaxis(signal_run, 2, 0))
             ds.sa['chunks'] = [run]
             # what did I have in mind???
             #ds.sa['dissimilarity'] = np.arange(len(sim))  # Lame one for now
@@ -296,8 +335,7 @@ def simple_sim1(shape, sims,
 
     # Instrumental noise -- the most banal
     assert(len(dss) == nsubjects)
-    assert(len(dss) == nsubjects)
-    assert(len(dss[0]) == nruns*len(sim))
+    assert(len(dss[0]) == nruns*len(dissim))
 
     return signal_clean, cluster_truth, dss
 

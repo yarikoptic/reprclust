@@ -27,12 +27,12 @@
 
 import numpy as np
 
-from nose.tools import assert_equal, assert_greater_equal, assert_true
-
+from scipy.spatial.distance import pdist, squareform
 from mvpa2.misc.neighborhood import Sphere
 
-from ..sim import get_intrinsic_noises, simple_sim1
+from ..sim import get_intrinsic_noises, simple_sim1, get_pattern_from_dissim
 
+from nose.tools import assert_equal, assert_greater_equal, assert_true
 from numpy.testing import assert_array_almost_equal
 
 def test_get_intrinsic_noises():
@@ -117,3 +117,30 @@ def test_simple_sim1_clean_per_subject():
     #pl.imshow(signal_clean[:, :, 0]); pl.colorbar(); pl.show()
     #pl.imshow(dss[0].a.mapper.reverse(dss[0].samples[0])); pl.colorbar();
     # pl.show()
+
+
+def _test_get_pattern_from_dissim_1d(dist, metric):
+    ptrns = get_pattern_from_dissim([dist], metric=metric)
+    assert_equal(ptrns.shape, (2, 1))
+    dist = pdist(ptrns, metric=metric)
+    assert_equal(np.asscalar(dist), dist)
+
+def test_get_pattern_from_dissim_1d():
+    for dist in [0.1, 1.0, 10]:
+        yield _test_get_pattern_from_dissim_1d, dist, "euclidean"
+
+def _test_get_pattern_from_dissim_random_ndim(ndim, metric):
+    # random points
+    optrns = np.abs(np.random.normal(size=(ndim, ndim)))
+    odist = pdist(optrns, metric=metric)
+
+    ptrns = get_pattern_from_dissim(odist, metric=metric)
+    assert_greater_equal(ndim, ptrns.shape[1])
+
+    dist = pdist(ptrns, metric=metric)
+    assert_array_almost_equal(odist, dist)
+
+def test_get_pattern_from_dissim_random_ndim():
+    for metric in ('euclidean', ):
+        for ndim in [2, 3, 10, 20]:
+            yield _test_get_pattern_from_dissim_random_ndim, ndim, metric

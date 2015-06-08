@@ -41,7 +41,7 @@ def mds_classical(d, ndim=2):
         Square matrix (or a vector of upper-triangular values)
         with distances between points
     ndim : int, optional
-        Number of ndim in the project to use. If degenerate (<=0)
+        Number of ndim in the project to use. If None or 0,
         then ndim is taken to be the minimal sufficient to describe
         given similarity structure
     """
@@ -62,7 +62,7 @@ def mds_classical(d, ndim=2):
 
     Y = U * np.sqrt(S)
 
-    if ndim <= 0:
+    if not ndim:
         # automatically figure out the space based on the rank of original
         # similarity matrix
         SA = np.abs(S)  # it should be positive semi-def but just to be sure
@@ -115,7 +115,8 @@ def test_mds_classical():
     yield _test_mds_classical, [1, 1, 1], 2, 2
     # it should figure out correctly
     yield _test_mds_classical, [1, 1, 1], 0, 2
-    yield _test_mds_classical, [1, 1, 1], -1, 2
+    yield _test_mds_classical, [1, 1, 1], None, 2
+    yield _test_mds_classical, [1, 1, 1], 0, 2
     yield _test_mds_classical, [[0, 1, 1], [1, 0, 1], [1, 1, 0]], 2, 2
 
 
@@ -141,6 +142,6 @@ def test_mds_classical_higher_dimensions():
         # they should fall back nicely into nd
         yield _test_mds_classical, pointsdist_2, nd, nd
         # and dimensionality should be figured out correctly as well
-        yield _test_mds_classical, pointsdist_2, -1, nd
+        yield _test_mds_classical, pointsdist_2, None, nd
         # and we should get "reasonable" solution by going higher
         yield _test_mds_classical, pointsdist_2, nd+1, nd+1
