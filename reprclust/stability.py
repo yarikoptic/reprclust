@@ -447,9 +447,9 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
     if likelihood is not None:
         likelihood = np.array(likelihood).ravel()
     if ari_gt is not None:
-        ari_gt = np.array(likelihood).ravel()
+        ari_gt = np.array(ari_gt).ravel()
     if ami_gt is not None:
-        ami_gt = np.array(likelihood).ravel()
+        ami_gt = np.array(ami_gt).ravel()
 
     return ks, ari, ami, stab, likelihood, ari_gt, ami_gt, stab_gt
 
