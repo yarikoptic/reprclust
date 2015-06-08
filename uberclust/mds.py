@@ -41,7 +41,9 @@ def mds_classical(d, ndim=2):
         Square matrix (or a vector of upper-triangular values)
         with distances between points
     ndim : int, optional
-        Number of ndim in the project to use
+        Number of ndim in the project to use. If degenerate (<=0)
+        then ndim is taken to be the minimal sufficient to describe
+        given similarity structure
     """
     d = np.asanyarray(d)
     if d.ndim == 1:
@@ -49,7 +51,7 @@ def mds_classical(d, ndim=2):
 
     (n, m) = d.shape
     assert(n == m)
-    assert(ndim > 0)
+    # assert(ndim > 0)
 
     E = -0.5 * d**2
 
@@ -60,12 +62,23 @@ def mds_classical(d, ndim=2):
 
     Y = U * np.sqrt(S)
 
+    if ndim <= 0:
+        # automatically figure out the space based on the rank of original
+        # similarity matrix
+        SA = np.abs(S)  # it should be positive semi-def but just to be sure
+        ndim = np.sum(SA >= SA[0]/1e6) # disregard tiny values in the tail
+
     return Y[:, :ndim]
 
 
 from nose.tools import assert_equal, assert_greater
 from numpy.testing import assert_array_almost_equal
 from mvpa2.misc.fx import get_random_rotation
+
+def _get_square_points(size):
+    """Return square array of points"""
+    return np.array([(i / size, i % size) for i in range(size**2)])
+
 
 def _test_mds_classical(d, ndim, targetndim):
     points = mds_classical(d, ndim)
@@ -77,7 +90,12 @@ def _test_mds_classical(d, ndim, targetndim):
         dsq = d
         d = squareform(d)
     npoints = len(dsq)
-    assert_equal(points.shape, (npoints, ndim))
+    assert_equal(len(points), npoints)
+    if ndim > 0:
+        assert_equal(points.shape[1], ndim)
+    else:
+        # so it was assessed
+        ndim = points.shape[1]
     pointsdist = pdist(points)
     if ndim == targetndim:
         assert_array_almost_equal(d, pointsdist)
@@ -89,17 +107,15 @@ def _test_mds_classical(d, ndim, targetndim):
         assert_greater(np.linalg.norm(pointsdist - d), np.linalg.norm(pointsdist_1 - d))
 
 
-def _get_square_points(size):
-    """Return square array of points"""
-    return np.array([(i / size, i % size) for i in range(size**2)])
-
-
 def test_mds_classical():
     # nothing wrong with a 1D case and 2 points
     yield _test_mds_classical, [1], 1, 1
     # and we could project from 2d to 1d with some success
     yield _test_mds_classical, [1, 1, 1], 1, 2
     yield _test_mds_classical, [1, 1, 1], 2, 2
+    # it should figure out correctly
+    yield _test_mds_classical, [1, 1, 1], 0, 2
+    yield _test_mds_classical, [1, 1, 1], -1, 2
     yield _test_mds_classical, [[0, 1, 1], [1, 0, 1], [1, 1, 0]], 2, 2
 
 
@@ -124,5 +140,7 @@ def test_mds_classical_higher_dimensions():
         pointsdist_2 = pdist(points)
         # they should fall back nicely into nd
         yield _test_mds_classical, pointsdist_2, nd, nd
+        # and dimensionality should be figured out correctly as well
+        yield _test_mds_classical, pointsdist_2, -1, nd
         # and we should get "reasonable" solution by going higher
         yield _test_mds_classical, pointsdist_2, nd+1, nd+1

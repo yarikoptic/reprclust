@@ -49,8 +49,9 @@ def test_get_intrinsic_noises():
 
 def test_simple_sim1_clean_per_subject():
     # no noise -- all must be clear
-    dissims = [[0.9], [0.8], [0.5], [0.3]]
-    args = (64, 64), dissims
+    # similarities per each of the clusters
+    sims = [[0.9], [0.8], [0.5], [0.3]]
+    args = (64, 64), sims
     kwargs = dict(
         roi_neighborhood=Sphere(6),
         nruns=3, nsubjects=2
@@ -63,6 +64,7 @@ def test_simple_sim1_clean_per_subject():
         noise_independent_std=0,
         noise_common_std=0,
         **kwargs)
+    import pdb; pdb.set_trace()
     # ,1 since we have only 1 value of dissim per each or ROIs
     assert_equal(signal_clean.shape, (64, 64, 1))
     # all dss should be identical to a_clean
