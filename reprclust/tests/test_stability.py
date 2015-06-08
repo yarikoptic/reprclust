@@ -121,6 +121,17 @@ def test_get_optimal_permutation():
     perm = get_optimal_permutation(a, b, 4)
     assert_array_equal(perm, np.array([3, 2, 1, 0]))
 
+    # case when we have different number of unique labels
+    a = np.array([1, 1, 2, 2, 0])
+    b = np.array([3, 3, 4, 4, 4])
+    # in this case order matters
+    # mapping a = p(b)
+    perm = get_optimal_permutation(a, b, 5)
+    assert_array_equal(perm, np.array([4, 3, 0, 1, 2]))
+    # mapping b = p(a)
+    perm = get_optimal_permutation(b, a, 5)
+    assert_array_equal(perm, np.array([0, 3, 4, 2, 1]))
+
 
 def test_stability_score():
     a = np.arange(9)

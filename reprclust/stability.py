@@ -460,7 +460,10 @@ def get_optimal_permutation(a, b, k):
     number of possible labels, in case they're not all present in `a` or `b`.
     """
     assert(a.shape == b.shape)
-    w = np.zeros((k, k), dtype=int)
+    # if we're testing against ground truth, then we need to store a bigger
+    # matrix
+    n = max(len(np.unique(a)), len(np.unique(b)), k)
+    w = np.zeros((n, n), dtype=int)
     for i, j in zip(a, b):
         w[i, j] += 1
     # make it a cost matrix
