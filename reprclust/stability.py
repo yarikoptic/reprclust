@@ -142,6 +142,12 @@ def compute_stability_fold(samples, train, test, method='ward',
             solution on the test set for `k` of ks[i] and the ground truth
             clusters of the data.
             Otherwise returns None.
+        stab_gt : array or None
+            If ground_truth is not None, a (max_k-1,) array, where stab_gt[i]
+            is the stability measure of the predicted clustering
+            solution on the test set for `k` of ks[i] and the ground truth
+            clusters of the data.
+            Otherwise returns None.
     """
     if method not in AVAILABLE_METHODS:
         raise ValueError('Method {0} not implemented'.format(method))
@@ -165,6 +171,8 @@ def compute_stability_fold(samples, train, test, method='ward',
     if ground_truth is not None:
         ari_gt = np.zeros(max_k-1)
         ami_gt = np.zeros(max_k-1)
+        if stability:
+            stab_gt = np.zeros(max_k-1)
 
     # get training and test
     train_set = [samples[x] for x in train]
@@ -251,6 +259,9 @@ def compute_stability_fold(samples, train, test, method='ward',
             ari_gt[i_k] = adjusted_rand_score(prediction_label, ground_truth)
             ami_gt[i_k] = adjusted_mutual_info_score(prediction_label,
                                                      ground_truth)
+            if stability:
+                stab_gt[i_k] = stability_score(prediction_label,
+                                               ground_truth, k)
 
     results = [ks, ari, ami]
     if stability:
@@ -266,6 +277,11 @@ def compute_stability_fold(samples, train, test, method='ward',
         results += [ari_gt, ami_gt]
     else:
         results += [None, None]
+
+    if stability and ground_truth is not None:
+        results.append(stab_gt)
+    else:
+        results.append(None)
 
     return results
 
@@ -356,6 +372,12 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
             solution on the test set for `k` of ks[i] and the ground truth
             clusters of the data.
             Otherwise returns None.
+        stab_gt : array or None
+            If ground_truth is not None, a (max_k-1,) array, where stab_gt[i]
+            is the stability measure of the predicted clustering
+            solution on the test set for `k` of ks[i] and the ground truth
+            clusters of the data.
+            Otherwise returns None.
     """
 
     result = Parallel(n_jobs=n_jobs, verbose=verbose)(delayed(
@@ -374,6 +396,7 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
     likelihood = []
     ari_gt = []
     ami_gt = []
+    stab_gt = []
 
     for r in result:
         ks.append(r[0])
@@ -400,9 +423,17 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
         else:
             ami_gt = None
 
+        if r[7] is not None:
+            stab_gt.append(r[7])
+        else:
+            stab_gt = None
+
     ks = np.array(ks).ravel()
     ari = np.array(ari).ravel()
     ami = np.array(ami).ravel()
+    if stab_gt is not None:
+        stab_gt = np.array(stab_gt).ravel()
+
     if stab is not None:
         stab = np.array(stab).ravel()
         # normalize stability
@@ -410,6 +441,9 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
             rand_stab_score = rand_stability_score(k, samples[0].shape[1],
                                                    rand_stab_rep)
             stab[ks == k] /= rand_stab_score
+            if stab_gt is not None:
+                stab_gt[ks == k] /= rand_stab_score
+
     if likelihood is not None:
         likelihood = np.array(likelihood).ravel()
     if ari_gt is not None:
@@ -417,7 +451,7 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
     if ami_gt is not None:
         ami_gt = np.array(likelihood).ravel()
 
-    return ks, ari, ami, stab, likelihood, ari_gt, ami_gt
+    return ks, ari, ami, stab, likelihood, ari_gt, ami_gt, stab_gt
 
 
 def get_optimal_permutation(a, b, k):

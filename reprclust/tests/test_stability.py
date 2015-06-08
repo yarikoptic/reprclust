@@ -30,7 +30,7 @@ def test_compute_stability_fold():
     dss = [(data + np.random.randn(*data.shape)).T for i in xrange(10)]
     # fake test, we should get a value of 1 for k=2
     idx_train = idx_test = range(10)
-    ks, ari, ami, stab, likelihood, ari_gt, ami_gt = \
+    ks, ari, ami, stab, likelihood, ari_gt, ami_gt, stab_gt = \
         compute_stability_fold(dss, idx_train, idx_test, max_k=20)
     assert_array_equal(ks, np.arange(2, 21))
     assert_array_equal(ari, np.ones(ari.shape))
@@ -39,8 +39,9 @@ def test_compute_stability_fold():
     assert_is_none(likelihood)
     assert_is_none(ari_gt)
     assert_is_none(ami_gt)
+    assert_is_none(stab_gt)
 
-    ground_truth = np.hstack((np.zeros(10), np.ones(10)))
+    ground_truth = np.hstack((np.zeros(10, dtype=int), np.ones(10, dtype=int)))
     # smoke test with all possible parameters
     for method in ['ward', 'complete', 'kmeans', 'gmm']:
         for stack in [True, False]:
@@ -60,7 +61,7 @@ def test_compute_stability_fold():
                             stability=stability,
                             cv_likelihood=cv_likelihood,
                             ground_truth=ground_truth)
-                        assert_true(len(result), 7)
+                        assert_true(len(result), 8)
 
 
 def test_compute_stability():
@@ -75,7 +76,7 @@ def test_compute_stability():
     for i in range(1, 3):
         assert_array_equal(result[i], np.ones(result[i].shape))
     assert_array_equal(result[3], np.zeros(result[3].shape))
-    assert_equal((None, None, None), result[4:])
+    assert_equal((None, None, None, None), result[4:])
 
 
 def test_generate_random_labeling():
