@@ -7,13 +7,14 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
 Module to compute stability estimates of clustering solutions using a method
-inspired by Yeo et al. (2011). The procedure cross-validates across
-subjects in the following way: the datasets are divided into training and
-test set; clustering is performed on the training set, and the solution is
-predicted on the test set. Then, the clustering solution is computed on the
-test set, and this is compared to the predicted one using the Adjusted Rand
-Index or the Adjusted Mutual Information as metrics. Clustering solutions
-are swept from k=2 to a maximum k defined by the user.
+inspired by Lange et al. (2004), and Yeo et al. (2011). The procedure
+cross-validates across subjects in the following way: the datasets are divided
+into training and test set; clustering is performed on the training set, and
+the solution is predicted on the test set. Then, the clustering solution is
+computed on the test set, and this is compared to the predicted one using the
+Adjusted Rand Index, the Adjusted Mutual Information, and the Instability Score
+(Lange et. al, 2004) as metrics. Clustering solutions are swept from k=2 to a
+maximum k defined by the user.
 
 At the moment the following clustering algorithms are implemented:
     - k-means
@@ -23,15 +24,15 @@ At the moment the following clustering algorithms are implemented:
 
 References:
 -----------
+Lange, T., Roth, V., Braun, M. and Buhmann J. (2004)
+"Stability-based validation of clustering solutions."
+Neural computation 16, no. 6 (2004): 1299-1323.
+
 Thomas Yeo, B. T., Krienen, F. M., Sepulcre, J., Sabuncu, M. R., Lashkari, D.,
 Hollinshead, M., et al. (2011).
 "The organization of the human cerebral cortex estimated by intrinsic
 functional connectivity."
 Journal of Neurophysiology, 106(3), 1125–1165. doi:10.1152/jn.00338.2011
-
-Lange, T., Roth, V., Braun, M. and Buhmann J. (2004)
-"Stability-based validation of clustering solutions."
-Neural computation 16, no. 6 (2004): 1299-1323.
 """
 from joblib import Parallel, delayed
 
