@@ -4,7 +4,7 @@ from numpy.testing import assert_array_equal
 import numpy as np
 from scipy.cluster.hierarchy import complete
 from scipy.spatial.distance import pdist
-from stability.stability import (cut_tree_scipy, compute_stability_fold,
+from reprclust.stability import (cut_tree_scipy, compute_stability_fold,
                                  compute_stability,
                                  get_optimal_permutation, permute,
                                  generate_random_labeling,

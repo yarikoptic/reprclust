@@ -1,5 +1,5 @@
 import numpy as np
-from stability.miscfx import triangles2edges
+from reprclust.miscfx import triangles2edges
 
 
 def test_triangles2edges():
