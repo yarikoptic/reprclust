@@ -1,5 +1,5 @@
 import numpy as np
-from ..surf_rotation import (area_triangle_cross,
+from stability.surf_rotation import (area_triangle_cross,
                              barycentric_interpolation,
                              rotate_surface)
 

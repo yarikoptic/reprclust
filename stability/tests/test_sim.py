@@ -31,7 +31,7 @@ from nose.tools import assert_equal, assert_greater_equal, assert_true
 
 from mvpa2.misc.neighborhood import Sphere
 
-from ..sim import get_intrinsic_noises, simple_sim1
+from stability.sim import get_intrinsic_noises, simple_sim1
 
 from numpy.testing import assert_array_almost_equal
 
