@@ -1,1 +1,1 @@
-from reprclust import compute_stability
+from stability import compute_stability
