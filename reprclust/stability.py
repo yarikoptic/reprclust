@@ -589,10 +589,10 @@ def correlation_score(predicted_label, test_label, data):
     # get permutation to go from test_label to predicted_label
     k = max(len(np.unique(predicted_label)), len(np.unique(test_label)),
             np.max(predicted_label), np.max(test_label))
-    perm = get_optimal_permutation(predicted_label, test_label, k)
+    perm = get_optimal_permutation(test_label, predicted_label, k)
     # permute
-    test_label = permute(test_label, perm)
-    assert(np.array_equal(np.unique(predicted_label), np.unique(test_label)))
+    predicted_label = permute(predicted_label, perm)
+    #assert(np.array_equal(np.unique(predicted_label), np.unique(test_label)))
     # compute correlation across corresponding clusters
     corr = 0
     for i in xrange(k):
