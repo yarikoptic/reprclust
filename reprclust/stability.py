@@ -593,7 +593,7 @@ def correlation_score(predicted_label, test_label, data):
         raise ValueError("predicted_label and test_label have completely "
                          "different labellings, I don't know what to do with "
                          "this.")
-    # get permutation to go from test_label to predicted_label
+    # get permutation to go from predicted_label to test_label
     k = max(len(np.unique(predicted_label)), len(np.unique(test_label)),
             np.max(predicted_label) + 1, np.max(test_label) + 1)
     perm = get_optimal_permutation(test_label, predicted_label, k)
