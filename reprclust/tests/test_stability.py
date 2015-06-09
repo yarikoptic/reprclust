@@ -9,7 +9,8 @@ from reprclust.stability import (cut_tree_scipy, compute_stability_fold,
                                  get_optimal_permutation, permute,
                                  generate_random_labeling,
                                  stability_score, norm_stability_score,
-                                 rand_stability_score)
+                                 rand_stability_score,
+                                 correlation_score)
 
 # create two far blobs easy to cluster
 blob1 = 2*np.random.randn(10, 2) + 100
@@ -172,3 +173,11 @@ def test_norm_stability_score():
         rand_score = rand_stability_score(len(np.unique(a)), len(a), s)
         score = norm_stability_score(a, b, rand_score, 10)
         assert_greater_equal(score, 0.)
+
+
+def test_correlation_score():
+    clust1 = np.random.normal(-5, 1, size=(5, 10))
+    clust2 = np.random.normal(5, 1, size=(5, 10))
+    true_clust = np.hstack((np.ones(10), np.zeros(10))).astype(int)
+    d = np.hstack((clust1, clust2))
+    assert_equal(correlation_score(true_clust, true_clust, d), 1.0)

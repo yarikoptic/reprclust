@@ -533,3 +533,24 @@ def norm_stability_score(predicted_label, test_label, rand_score, k):
     # compute score and normalize it
     score = stability_score(predicted_label, test_label, k)/rand_score
     return score
+
+
+def correlation_score(predicted_label, test_label, data):
+    """Computes the correlation between the average RDMs in each
+    corresponding cluster.
+    """
+    # get permutation to go from test_label to predicted_label
+    k = max(len(np.unique(predicted_label)), len(np.unique(test_label)),
+            np.max(predicted_label), np.max(test_label))
+    perm = get_optimal_permutation(predicted_label, test_label, k)
+    # permute
+    test_label = permute(test_label, perm)
+    assert(np.array_equal(np.unique(predicted_label), np.unique(test_label)))
+    # compute correlation across corresponding clusters
+    corr = 0
+    for i in xrange(k):
+        c1 = np.mean(data[:, test_label == i], axis=-1)
+        c2 = np.mean(data[:, predicted_label == i], axis=-1)
+        corr += np.dot(c1, c2)/np.sqrt(((c1**2).sum() * (c2**2).sum()))
+    corr /= k
+    return corr
