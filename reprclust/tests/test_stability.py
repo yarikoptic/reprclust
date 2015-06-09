@@ -5,6 +5,7 @@ from numpy.testing import assert_array_equal
 import numpy as np
 from scipy.cluster.hierarchy import complete
 from scipy.spatial.distance import pdist
+from scipy.stats import rankdata
 from reprclust.stability import (cut_tree_scipy, compute_stability_fold,
                                  compute_stability,
                                  get_optimal_permutation, permute,
@@ -196,3 +197,4 @@ def test_correlation_score():
     true_clust = np.hstack((np.ones(10), np.zeros(10))).astype(int)
     d = np.hstack((clust1, clust2))
     assert_equal(correlation_score(true_clust, true_clust, d), 1.0)
+    assert_equal(correlation_score(true_clust, true_clust, d, corr_score='spearman'), 1.0)

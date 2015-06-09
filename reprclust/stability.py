@@ -40,6 +40,7 @@ import numpy as np
 
 from scipy.spatial.distance import pdist, hamming
 from scipy.cluster.hierarchy import complete
+from scipy.stats import rankdata
 
 from sklearn.cluster import KMeans
 from sklearn.cluster.hierarchical import _hc_cut, ward_tree
@@ -66,7 +67,7 @@ def cut_tree_scipy(Y, k):
 def compute_stability_fold(samples, train, test, method='ward',
                            max_k=None, stack=False,
                            stability=True, cv_likelihood=False,
-                           corr_score=False,
+                           corr_score=None,
                            ground_truth=None, n_neighbors=1,  **kwargs):
     """
     General function to compute the stability on a cross-validation fold.
@@ -96,8 +97,9 @@ def compute_stability_fold(samples, train, test, method='ward',
         cv_likelihood : bool
             Whether to compute the cross-validated likelihood for mixture
             model; only valid if 'gmm' method is used. Default is False.
-        corr_score : bool
-            Whether to compute the correlation score. Default is False.
+        corr_score : {'pearson','spearman'} or None
+            Whether to compute the specified type of correlation score. 
+            Default is None.
         ground_truth : array or None
             Array containing the ground truth of the clustering of the data,
             useful to compare stability against ground truth for simulations.
@@ -175,14 +177,14 @@ def compute_stability_fold(samples, train, test, method='ward',
         stab = np.zeros(max_k-1)
     if cv_likelihood:
         likelihood = np.zeros(max_k-1)
-    if corr_score:
+    if corr_score is not None:
         corr = np.zeros(max_k-1)
     if ground_truth is not None:
         ari_gt = np.zeros(max_k-1)
         ami_gt = np.zeros(max_k-1)
         if stability:
             stab_gt = np.zeros(max_k-1)
-        if corr_score:
+        if corr_score is not None:
             corr_gt = np.zeros(max_k-1)
 
     # get training and test
@@ -266,9 +268,9 @@ def compute_stability_fold(samples, train, test, method='ward',
             stab[i_k] = stability_score(prediction_label, test_label, k)
         if cv_likelihood:
             likelihood[i_k] = log_prob
-        if corr_score:
+        if corr_score is not None:
             corr[i_k] = correlation_score(prediction_label, test_label,
-                                          test_ds)
+                                          test_ds, corr_score)
         if ground_truth is not None:
             ari_gt[i_k] = adjusted_rand_score(prediction_label, ground_truth)
             ami_gt[i_k] = adjusted_mutual_info_score(prediction_label,
@@ -276,10 +278,10 @@ def compute_stability_fold(samples, train, test, method='ward',
             if stability:
                 stab_gt[i_k] = stability_score(prediction_label,
                                                ground_truth, k)
-            if corr_score:
+            if corr_score is not None:
                 corr_gt[i_k] = correlation_score(prediction_label,
                                                  ground_truth,
-                                                 test_ds)
+                                                 test_ds, corr_score)
 
     results = [ks, ari, ami]
     if stability:
@@ -301,12 +303,12 @@ def compute_stability_fold(samples, train, test, method='ward',
     else:
         results.append(None)
 
-    if corr_score:
+    if corr_score is not None:
         results.append(corr)
     else:
         results.append(None)
 
-    if corr_score and ground_truth is not None:
+    if corr_score is not None and ground_truth is not None:
         results.append(corr_gt)
     else:
         results.append(None)
@@ -316,7 +318,7 @@ def compute_stability_fold(samples, train, test, method='ward',
 
 def compute_stability(splitter, samples, method='ward', max_k=None,
                       stack=False, stability=True, cv_likelihood=False,
-                      corr_score=False,
+                      corr_score=None,
                       ground_truth=None, n_neighbors=1, rand_stab_rep=20,
                       n_jobs=1, verbose=51, **kwargs):
     """
@@ -589,7 +591,7 @@ def correlation(x, y):
     return np.dot(c1, c2)/np.sqrt(((c1**2).sum() * (c2**2).sum()))
 
 
-def correlation_score(predicted_label, test_label, data):
+def correlation_score(predicted_label, test_label, data, corr_score='pearson'):
     """Computes the correlation between the average RDMs in each
     corresponding cluster.
     """
@@ -623,7 +625,12 @@ def correlation_score(predicted_label, test_label, data):
         assert(len(np.unique(data[:, predicted_label == i])) > 0)
         c1 = np.mean(data[:, test_label == i], axis=-1)
         c2 = np.mean(data[:, predicted_label == i], axis=-1)
-        corr += correlation(c1, c2)
+        if corr_score == 'pearson':
+            corr += correlation(rankdata(c1), rankdata(c2))
+        elif corr_score == 'spearman':
+            corr += correlation(c1, c2)
+        else:
+            raise ValueError("We shouldn't get here.")
     corr /= len(labels)
 
     return corr
