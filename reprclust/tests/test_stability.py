@@ -1,5 +1,6 @@
 from nose.tools import assert_equal, assert_true, assert_raises, \
-    assert_is_none, assert_is_instance, assert_less_equal, assert_greater_equal
+    assert_is_none, assert_is_instance, assert_less_equal, \
+    assert_greater_equal, assert_almost_equal
 from numpy.testing import assert_array_equal
 import numpy as np
 from scipy.cluster.hierarchy import complete
@@ -9,7 +10,7 @@ from reprclust.stability import (cut_tree_scipy, compute_stability_fold,
                                  get_optimal_permutation, permute,
                                  generate_random_labeling,
                                  stability_score, norm_stability_score,
-                                 rand_stability_score,
+                                 rand_stability_score, correlation,
                                  correlation_score)
 
 # create two far blobs easy to cluster
@@ -175,6 +176,13 @@ def test_norm_stability_score():
         rand_score = rand_stability_score(len(np.unique(a)), len(a), s)
         score = norm_stability_score(a, b, rand_score, 10)
         assert_greater_equal(score, 0.)
+
+
+def test_correlation():
+    for i in xrange(10):
+        x = np.random.normal(4, 2, size=10)
+        y = np.random.normal(-3, 2, size=10)
+        assert_almost_equal(correlation(x, y), np.corrcoef(x, y)[0, 1])
 
 
 def test_correlation_score():

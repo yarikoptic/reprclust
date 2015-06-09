@@ -582,6 +582,13 @@ def norm_stability_score(predicted_label, test_label, rand_score, k):
     return score
 
 
+def correlation(x, y):
+    """Compute correlation of vectors x and y"""
+    c1 = x - x.mean()
+    c2 = y - y.mean()
+    return np.dot(c1, c2)/np.sqrt(((c1**2).sum() * (c2**2).sum()))
+
+
 def correlation_score(predicted_label, test_label, data):
     """Computes the correlation between the average RDMs in each
     corresponding cluster.
@@ -616,7 +623,7 @@ def correlation_score(predicted_label, test_label, data):
         assert(len(np.unique(data[:, predicted_label == i])) > 0)
         c1 = np.mean(data[:, test_label == i], axis=-1)
         c2 = np.mean(data[:, predicted_label == i], axis=-1)
-        corr += np.dot(c1, c2)/np.sqrt(((c1**2).sum() * (c2**2).sum()))
+        corr += correlation(c1, c2)
     corr /= k
 
     return corr
