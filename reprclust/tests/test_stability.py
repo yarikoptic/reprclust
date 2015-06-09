@@ -94,6 +94,11 @@ def test_permute():
     b = np.arange(9)[::-1]
     assert_array_equal(a, permute(b, b))
 
+    a = np.array([0, 0, 1, 2, 1, 3])
+    b = np.array([1, 1, 3, 2, 3, 0])
+    p = np.array([3, 0, 2, 1])
+    assert_array_equal(a, permute(b, p))
+
 
 def test_get_optimal_permutation():
     # simple permutation

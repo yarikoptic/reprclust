@@ -600,12 +600,12 @@ def correlation_score(predicted_label, test_label, data):
         raise ValueError("predicted_label and test_label have completely "
                          "different labellings, I don't know what to do with "
                          "this.")
-    # get permutation to go from predicted_label to test_label
+    # get permutation to match predicted_label to test_label
     k = max(len(np.unique(predicted_label)), len(np.unique(test_label)),
             np.max(predicted_label) + 1, np.max(test_label) + 1)
     perm = get_optimal_permutation(test_label, predicted_label, k)
     # permute
-    test_label = permute(test_label, perm)
+    predicted_label = permute(predicted_label, perm)
     # compute correlation across corresponding clusters
     corr = 0
     # to account for the case in which I'm testing against ground truth,
@@ -624,6 +624,6 @@ def correlation_score(predicted_label, test_label, data):
         c1 = np.mean(data[:, test_label == i], axis=-1)
         c2 = np.mean(data[:, predicted_label == i], axis=-1)
         corr += correlation(c1, c2)
-    corr /= k
+    corr /= len(labels)
 
     return corr
