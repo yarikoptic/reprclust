@@ -586,18 +586,37 @@ def correlation_score(predicted_label, test_label, data):
     """Computes the correlation between the average RDMs in each
     corresponding cluster.
     """
+    unique_test = np.unique(test_label)
+    unique_pred = np.unique(predicted_label)
+    # if we have completely different labels, complain
+    if not set(unique_test).intersection(unique_pred):
+        raise ValueError("predicted_label and test_label have completely "
+                         "different labellings, I don't know what to do with "
+                         "this.")
     # get permutation to go from test_label to predicted_label
     k = max(len(np.unique(predicted_label)), len(np.unique(test_label)),
-            np.max(predicted_label), np.max(test_label))
+            np.max(predicted_label) + 1, np.max(test_label) + 1)
     perm = get_optimal_permutation(test_label, predicted_label, k)
     # permute
-    predicted_label = permute(predicted_label, perm)
-    #assert(np.array_equal(np.unique(predicted_label), np.unique(test_label)))
+    test_label = permute(test_label, perm)
     # compute correlation across corresponding clusters
     corr = 0
-    for i in xrange(k):
+    # to account for the case in which I'm testing against ground truth,
+    # I need to cycle through the intersection of unique labels
+    # recompute the unique labels after permutation
+    unique_test = np.unique(test_label)
+    unique_pred = np.unique(predicted_label)
+#    if len(unique_test) <= len(unique_pred):
+#        labels = unique_test
+#    else:
+#        labels = unique_pred
+    labels = np.intersect1d(unique_test, unique_pred, assume_unique=True)
+    for i in labels:
+        assert(len(np.unique(data[:, test_label == i])) > 0)
+        assert(len(np.unique(data[:, predicted_label == i])) > 0)
         c1 = np.mean(data[:, test_label == i], axis=-1)
         c2 = np.mean(data[:, predicted_label == i], axis=-1)
         corr += np.dot(c1, c2)/np.sqrt(((c1**2).sum() * (c2**2).sum()))
     corr /= k
+
     return corr
