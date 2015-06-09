@@ -66,6 +66,7 @@ def cut_tree_scipy(Y, k):
 def compute_stability_fold(samples, train, test, method='ward',
                            max_k=None, stack=False,
                            stability=True, cv_likelihood=False,
+                           corr_score=False,
                            ground_truth=None, n_neighbors=1,  **kwargs):
     """
     General function to compute the stability on a cross-validation fold.
@@ -95,6 +96,8 @@ def compute_stability_fold(samples, train, test, method='ward',
         cv_likelihood : bool
             Whether to compute the cross-validated likelihood for mixture
             model; only valid if 'gmm' method is used. Default is False.
+        corr_score : bool
+            Whether to compute the correlation score. Default is False.
         ground_truth : array or None
             Array containing the ground truth of the clustering of the data,
             useful to compare stability against ground truth for simulations.
@@ -148,6 +151,10 @@ def compute_stability_fold(samples, train, test, method='ward',
             solution on the test set for `k` of ks[i] and the ground truth
             clusters of the data.
             Otherwise returns None.
+        corr : array or None
+            Average correlation for each fold. TODO
+        corr_gt : array or None
+            Avg correlation against GT. TODO
     """
     if method not in AVAILABLE_METHODS:
         raise ValueError('Method {0} not implemented'.format(method))
@@ -168,11 +175,15 @@ def compute_stability_fold(samples, train, test, method='ward',
         stab = np.zeros(max_k-1)
     if cv_likelihood:
         likelihood = np.zeros(max_k-1)
+    if corr_score:
+        corr = np.zeros(max_k-1)
     if ground_truth is not None:
         ari_gt = np.zeros(max_k-1)
         ami_gt = np.zeros(max_k-1)
         if stability:
             stab_gt = np.zeros(max_k-1)
+        if corr_score:
+            corr_gt = np.zeros(max_k-1)
 
     # get training and test
     train_set = [samples[x] for x in train]
@@ -255,6 +266,9 @@ def compute_stability_fold(samples, train, test, method='ward',
             stab[i_k] = stability_score(prediction_label, test_label, k)
         if cv_likelihood:
             likelihood[i_k] = log_prob
+        if corr_score:
+            corr[i_k] = correlation_score(prediction_label, test_label,
+                                          test_ds)
         if ground_truth is not None:
             ari_gt[i_k] = adjusted_rand_score(prediction_label, ground_truth)
             ami_gt[i_k] = adjusted_mutual_info_score(prediction_label,
@@ -262,6 +276,10 @@ def compute_stability_fold(samples, train, test, method='ward',
             if stability:
                 stab_gt[i_k] = stability_score(prediction_label,
                                                ground_truth, k)
+            if corr_score:
+                corr_gt[i_k] = correlation_score(prediction_label,
+                                                 ground_truth,
+                                                 test_ds)
 
     results = [ks, ari, ami]
     if stability:
@@ -283,11 +301,22 @@ def compute_stability_fold(samples, train, test, method='ward',
     else:
         results.append(None)
 
+    if corr_score:
+        results.append(corr)
+    else:
+        results.append(None)
+
+    if corr_score and ground_truth is not None:
+        results.append(corr_gt)
+    else:
+        results.append(None)
+
     return results
 
 
 def compute_stability(splitter, samples, method='ward', max_k=None,
                       stack=False, stability=True, cv_likelihood=False,
+                      corr_score=False,
                       ground_truth=None, n_neighbors=1, rand_stab_rep=20,
                       n_jobs=1, verbose=51, **kwargs):
     """
@@ -384,6 +413,7 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
         compute_stability_fold)(samples, train, test, method=method,
                                 max_k=max_k, stack=stack, stability=stability,
                                 cv_likelihood=cv_likelihood,
+                                corr_score=corr_score,
                                 ground_truth=ground_truth,
                                 n_neighbors=n_neighbors,
                                 **kwargs) for train, test in splitter)
@@ -397,6 +427,8 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
     ari_gt = []
     ami_gt = []
     stab_gt = []
+    corr = []
+    corr_gt = []
 
     for r in result:
         ks.append(r[0])
@@ -428,6 +460,16 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
         else:
             stab_gt = None
 
+        if r[8] is not None:
+            corr.append(r[8])
+        else:
+            corr = None
+
+        if r[9] is not None:
+            corr_gt.append(r[9])
+        else:
+            corr_gt = None
+
     ks = np.array(ks).ravel()
     ari = np.array(ari).ravel()
     ami = np.array(ami).ravel()
@@ -450,8 +492,13 @@ def compute_stability(splitter, samples, method='ward', max_k=None,
         ari_gt = np.array(ari_gt).ravel()
     if ami_gt is not None:
         ami_gt = np.array(ami_gt).ravel()
+    if corr is not None:
+        corr = np.array(corr).ravel()
+        if corr_gt is not None:
+            corr_gt = np.array(corr_gt).ravel()
 
-    return ks, ari, ami, stab, likelihood, ari_gt, ami_gt, stab_gt
+    return ks, ari, ami, stab, likelihood, ari_gt, ami_gt, stab_gt, corr, \
+        corr_gt
 
 
 def get_optimal_permutation(a, b, k):
@@ -533,3 +580,50 @@ def norm_stability_score(predicted_label, test_label, rand_score, k):
     # compute score and normalize it
     score = stability_score(predicted_label, test_label, k)/rand_score
     return score
+
+
+def correlation(x, y):
+    """Compute correlation of vectors x and y"""
+    c1 = x - x.mean()
+    c2 = y - y.mean()
+    return np.dot(c1, c2)/np.sqrt(((c1**2).sum() * (c2**2).sum()))
+
+
+def correlation_score(predicted_label, test_label, data):
+    """Computes the correlation between the average RDMs in each
+    corresponding cluster.
+    """
+    unique_test = np.unique(test_label)
+    unique_pred = np.unique(predicted_label)
+    # if we have completely different labels, complain
+    if not set(unique_test).intersection(unique_pred):
+        raise ValueError("predicted_label and test_label have completely "
+                         "different labellings, I don't know what to do with "
+                         "this.")
+    # get permutation to match predicted_label to test_label
+    k = max(len(np.unique(predicted_label)), len(np.unique(test_label)),
+            np.max(predicted_label) + 1, np.max(test_label) + 1)
+    perm = get_optimal_permutation(test_label, predicted_label, k)
+    # permute
+    predicted_label = permute(predicted_label, perm)
+    # compute correlation across corresponding clusters
+    corr = 0
+    # to account for the case in which I'm testing against ground truth,
+    # I need to cycle through the intersection of unique labels
+    # recompute the unique labels after permutation
+    unique_test = np.unique(test_label)
+    unique_pred = np.unique(predicted_label)
+#    if len(unique_test) <= len(unique_pred):
+#        labels = unique_test
+#    else:
+#        labels = unique_pred
+    labels = np.intersect1d(unique_test, unique_pred, assume_unique=True)
+    for i in labels:
+        assert(len(np.unique(data[:, test_label == i])) > 0)
+        assert(len(np.unique(data[:, predicted_label == i])) > 0)
+        c1 = np.mean(data[:, test_label == i], axis=-1)
+        c2 = np.mean(data[:, predicted_label == i], axis=-1)
+        corr += correlation(c1, c2)
+    corr /= len(labels)
+
+    return corr
