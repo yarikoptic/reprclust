@@ -2,7 +2,8 @@ require(reshape2)
 require(plyr)
 require(ggplot2)
 
-data <- read.csv('simulation_results_rsph6.5.csv')
+fnin <- commandArgs(TRUE)[1]
+data <- read.csv(fnin)
 data$k <- as.factor(data$k)
 data <- data[,-1]
 data_ <- melt(data, value.name='Value', variable.name='Index')
@@ -38,7 +39,7 @@ ggplot(data_, aes(k, Value, group=k)) +
     facet_grid(Algorithm ~ Index) + 
     theme_bw(base_size=18)
 
-fnout <- 'simulation_results_rsph6.5.pdf'
+fnout <- sub('.csv', '.pdf', fnin)
 cat(paste('Saving', fnout, '\n'))
 
 pdf(file=fnout, onefile=F, title='', 
