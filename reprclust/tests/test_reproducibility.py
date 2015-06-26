@@ -19,6 +19,7 @@ idx_train = idx_test = range(10)
 fake_splitter = [(idx_train, idx_test)]
 ground_truth = np.hstack((np.zeros(10, dtype=int), np.ones(10, dtype=int)))
 
+
 def test_run_method():
     repr = Reproducibility(dss, fake_splitter, WardClusterMethod(), ks=20,
                            ground_truth=ground_truth)
