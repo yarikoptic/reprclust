@@ -41,6 +41,59 @@ import numpy as np
 from reprclust.cluster_methods import ClusterMethod
 from reprclust.cluster_metrics import ari, ami
 
+# this must be outside the class to allow parallelization
+def _run_fold(self, train, test):
+    """Run reproducibility algorithm on one fold for all the ks"""
+    # initialize methods
+    cm_train = self._cluster_method()
+    cm_test = self._cluster_method()
+
+    # XXX: this should change depending on the type of data
+    # link clustering method to data
+    data_train = [self._data[tr_idx] for tr_idx in train]
+    data_test = [self._data[te_idx] for te_idx in test]
+
+    if self._stack:
+        data_train = np.vstack(data_train)
+        data_test = np.vstack(data_train)
+    else:
+        data_train = np.mean(np.dstack(data_train), axis=-1)
+        data_test = np.mean(np.dstack(data_test), axis=-1)
+
+    cm_train(data_train)
+    cm_test(data_test)
+
+    # allocate storing dictionary
+    result_fold = {}
+    for metric in self._cluster_metrics:
+        result_fold[metric.__name__] = \
+            np.vstack((self._ks, np.zeros(len(self._ks))))
+        if self._ground_truth:
+            result_fold[metric.__name__ + '_gt'] = \
+                np.vstack((self._ks, np.zeros(len(self._ks))))
+
+    # Step 1. Clustering on training/test set and prediction
+    for k in self._ks:
+        # cluster on training set
+        cm_train.cluster(k)
+        # use this clustering to predict test set
+        cm_train.predict(data_test, k)
+        # cluster on test set
+        cm_test.cluster(k)
+
+    # Step 2. Compute scores and store them
+    for i_k, k in enumerate(self._ks):
+        predicted_label = cm_train.get_predicted_clusters(k)
+        test_label = cm_test.get_clusters(k)
+        for metric in self._cluster_metrics:
+            result_fold[metric.__name__][1, i_k] = \
+                metric(predicted_label, test_label)
+            if self._ground_truth:
+                result_fold[metric.__name__ + '_gt'][1, i_k] = \
+                    metric(predicted_label, self._ground_truth)
+    return result_fold
+
+
 class Reproducibility(object):
     """Class to compute reproducibility on a dataset
 
@@ -73,9 +126,15 @@ class Reproducibility(object):
     """
     def __init__(self, data, splitter, cluster_method, ks, stack=False,
                  ground_truth=None, cluster_metrics=(ari, ami)):
-        if not isinstance(cluster_method, ClusterMethod):
+        # XXX: this should be decided how to allow already instatiated objects
+        if not isinstance(cluster_method(), ClusterMethod):
             raise ValueError('cluster_method must be an instance of '
                              'ClusterMethod')
+        if np.max(ks) > data[0].shape[0]:
+            raise ValueError('Cannot find more cluster than number of '
+                             'things to cluster. Got max k = {0} with number'
+                             ' of features {1}'.format(np.max(ks),
+                                                      data[0].shape[0]))
         self._data = data
         self._splitter = splitter
         self._cluster_method = cluster_method
@@ -96,55 +155,11 @@ class Reproducibility(object):
             if ground_truth:
                 self.scores[metric.__name__ + '_gt'] = None
 
-    def _run_fold(self, train, test):
-        """Run reproducibility algorithm on one fold for all the ks"""
-        # initialize methods
-        cm_train = self._cluster_method()
-        cm_test = self._cluster_method()
-
-        # link clustering method to data
-        data_train = self._data[train]
-        data_test = self._data[test]
-        cm_train(data_train)
-        cm_test(data_test)
-
-        # allocate storing dictionary
-        result_fold = {}
-        for metric in self._cluster_metrics:
-            result_fold[metric.__name__] = \
-                np.vstack((self._ks, np.zeros(len(self._ks))))
-            if self._ground_truth:
-                result_fold[metric.__name__ + '_gt'] = \
-                    np.vstack((self._ks, np.zeros(len(self._ks))))
-
-        # Step 1. Clustering on training/test set and prediction
-        for k in self._ks:
-            # cluster on training set
-            cm_train.cluster(k)
-            # use this clustering to predict test set
-            cm_train.predict(data_test, k)
-            # cluster on test set
-            cm_test.cluster(k)
-
-        # Step 2. Compute scores and store them
-        for i_k, k in enumerate(self._ks):
-            predicted_label = cm_train.get_predicted_clusters(k)
-            test_label = cm_test.get_clusters(k)
-            for metric in self._cluster_metrics:
-                result_fold[metric.__name__][1, i_k] = \
-                    metric(predicted_label, test_label)
-                if self._ground_truth:
-                    result_fold[metric.__name__ + '_gt'][1, i_k] = \
-                        metric(predicted_label, self._ground_truth)
-        return result_fold
-
     def run(self, n_jobs=1, verbose=52):
         parallel = Parallel(n_jobs=n_jobs, verbose=verbose)
-        fold = delayed(self._run_fold)
+        fold = delayed(_run_fold)
         result = parallel(fold(self, train, test)
                           for train, test in self._splitter)
         # store everything together now
         for metrics in result[0]:
-            self.scores[metrics] = np.vstack((res[metrics] for res in result))
-
-
+            self.scores[metrics] = np.hstack((res[metrics] for res in result))
