@@ -1,5 +1,6 @@
 from nose.tools import (assert_raises, assert_is_none,
                         assert_is_not_none, assert_false,
+                        assert_equal,
                         assert_true, assert_is_instance)
 import numpy as np
 from numpy.testing import assert_array_equal
@@ -43,6 +44,10 @@ def _test_clustermethods(cm):
         assert_is_none(cm.cluster(k))
         assert_is_none(cm.predict(data, k))
         assert_array_equal(cm.get_clusters(k), cm.get_predicted_clusters(k))
+        # XXX: temporary fix. apparently GMM might return less than the
+        # number of components requested
+        if cm.method.__name__ is not 'GMM':
+            assert_equal(len(np.unique(cm.get_clusters(k))), k)
 
     if hasattr(cm, 'get_method'):
         for k in range(2, 10):
@@ -50,5 +55,5 @@ def _test_clustermethods(cm):
 
 
 def test_implemented_clustermethods():
-    for cm in [WardClusterMethod, GMMClusterMethod, KMeansClusterMethod]:
+    for cm in [WardClusterMethod, KMeansClusterMethod, GMMClusterMethod]:
         yield _test_clustermethods, cm()
