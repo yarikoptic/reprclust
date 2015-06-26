@@ -68,7 +68,7 @@ def _run_fold(self, train, test):
     for metric in self._cluster_metrics:
         result_fold[metric.__name__] = \
             np.vstack((self._ks, np.zeros(len(self._ks))))
-        if self._ground_truth:
+        if self._ground_truth is not None:
             result_fold[metric.__name__ + '_gt'] = \
                 np.vstack((self._ks, np.zeros(len(self._ks))))
 
@@ -88,7 +88,7 @@ def _run_fold(self, train, test):
         for metric in self._cluster_metrics:
             result_fold[metric.__name__][1, i_k] = \
                 metric(predicted_label, test_label)
-            if self._ground_truth:
+            if self._ground_truth is not None:
                 result_fold[metric.__name__ + '_gt'][1, i_k] = \
                     metric(predicted_label, self._ground_truth)
     return result_fold
@@ -152,7 +152,7 @@ class Reproducibility(object):
         for metric in cluster_metrics:
             self.scores[metric.__name__] = None
             # also add keys with ground truth if we have it
-            if ground_truth:
+            if ground_truth is not None:
                 self.scores[metric.__name__ + '_gt'] = None
 
     def run(self, n_jobs=1, verbose=52):
