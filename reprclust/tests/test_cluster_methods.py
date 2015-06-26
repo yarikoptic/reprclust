@@ -1,6 +1,6 @@
 from nose.tools import (assert_raises, assert_is_none,
                         assert_is_not_none, assert_false,
-                        assert_equal,
+                        assert_equal, assert_is,
                         assert_true, assert_is_instance)
 import numpy as np
 from numpy.testing import assert_array_equal
@@ -40,6 +40,8 @@ def test_clustermethod():
 def _test_clustermethods(cm):
     # store the data
     cm(data)
+    # check we're not copying data
+    assert_is(data, cm.data)
     for k in range(2, 10):
         assert_is_none(cm.cluster(k))
         assert_is_none(cm.predict(data, k))
