@@ -1,5 +1,6 @@
-from nose.tools import (assert_raises, assert_is_none, assert_false,
-                        assert_true)
+from nose.tools import (assert_raises, assert_is_none,
+                        assert_is_not_none, assert_false,
+                        assert_true, assert_is_instance)
 import numpy as np
 from numpy.testing import assert_array_equal
 from reprclust.cluster_methods import (ClusterMethod, GMMClusterMethod,
@@ -34,3 +35,20 @@ def test_clustermethod():
     assert_is_none(cm.get_predicted_clusters(2))
     assert_false(cm.run)
     assert_array_equal(cm.data, data)
+
+def _test_clustermethods(cm):
+    # store the data
+    cm(data)
+    for k in range(2, 10):
+        assert_is_none(cm.cluster(k))
+        assert_is_none(cm.predict(data, k))
+        assert_array_equal(cm.get_clusters(k), cm.get_predicted_clusters(k))
+
+    if hasattr(cm, 'get_method'):
+        for k in range(2, 10):
+            assert_is_not_none(cm.get_method(k))
+
+
+def test_implemented_clustermethods():
+    for cm in [WardClusterMethod, GMMClusterMethod, KMeansClusterMethod]:
+        yield _test_clustermethods, cm()

@@ -83,7 +83,7 @@ class ClusterMethod(object):
 
 class WardClusterMethod(ClusterMethod):
     def __init__(self, *args, **kwargs):
-        super(WardClusterMethod).__init__(ward_tree)
+        super(WardClusterMethod, self).__init__(ward_tree)
         # store args and kwargs here
         self._args = args
         self._kwargs = kwargs
@@ -113,7 +113,7 @@ class WardClusterMethod(ClusterMethod):
 
 class GMMClusterMethod(ClusterMethod):
     def __init__(self, *args, **kwargs):
-        super(GMMClusterMethod).__init__(GMM)
+        super(GMMClusterMethod, self).__init__(GMM)
         self._args = args
         self._kwargs = kwargs
         self._method_output = None
@@ -140,7 +140,7 @@ class GMMClusterMethod(ClusterMethod):
 
 class KMeansClusterMethod(ClusterMethod):
     def __init__(self, *args, **kwargs):
-        super(KMeansClusterMethod).__init__(KMeans)
+        super(KMeansClusterMethod, self).__init__(KMeans)
         self._args = args
         self._kwargs = kwargs
         self._method_output = None
