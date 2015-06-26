@@ -48,12 +48,15 @@ class ClusterMethod(object):
         Returns the predicted cluster solution for k clusters.
     """
     def __init__(self, clustering_method):
+        if not hasattr(clustering_method, '__call__'):
+            raise ValueError('clustering_method must be a callable')
         self.method = clustering_method
         self._run = False
         # we'll store the actual clusters here
         self._clusters = {}
         # we'll store the predicted clusters here
         self._predicted = {}
+        self.data = None
 
     def __call__(self, data):
         """Just store the input data"""
