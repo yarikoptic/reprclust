@@ -34,6 +34,8 @@ Hollinshead, M., et al. (2011).
 functional connectivity."
 Journal of Neurophysiology, 106(3), 1125–1165. doi:10.1152/jn.00338.2011
 """
+import copy
+
 from joblib import Parallel, delayed
 
 import numpy as np
@@ -45,8 +47,10 @@ from reprclust.cluster_metrics import ari, ami
 def _run_fold(self, train, test):
     """Run reproducibility algorithm on one fold for all the ks"""
     # initialize methods
-    cm_train = self._cluster_method()
-    cm_test = self._cluster_method()
+    cm_train = self._cluster_method
+    # copy the method for the testing part too
+    # XXX: am I killing myself with all these copies?
+    cm_test = copy.deepcopy(cm_train)
 
     # XXX: this should change depending on the type of data
     # link clustering method to data
@@ -126,8 +130,7 @@ class Reproducibility(object):
     """
     def __init__(self, data, splitter, cluster_method, ks, stack=False,
                  ground_truth=None, cluster_metrics=(ari, ami)):
-        # XXX: this should be decided how to allow already instatiated objects
-        if not isinstance(cluster_method(), ClusterMethod):
+        if not isinstance(cluster_method, ClusterMethod):
             raise ValueError('cluster_method must be an instance of '
                              'ClusterMethod')
         if np.max(ks) > data[0].shape[0]:
