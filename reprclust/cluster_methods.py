@@ -26,6 +26,36 @@ from sklearn.mixture import GMM
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.utils.linear_assignment_ import linear_assignment
 
+
+def cut_tree_scipy(Y, k):
+    """ Given the output Y of a hierarchical clustering solution from scipy
+    and a number k, cuts the tree and returns the labels.
+    """
+    children = Y[:, 0:2].astype(int)
+    # convert children to correct values for _hc_cut
+    return _hc_cut(k, children, len(children)+1)
+
+def _predict_knn(self, newdata, k, n_neighbors=1):
+    """Common function to be used to predict clustering solution when method
+    doesn't have built-in prediction method"""
+    if k not in self._clusters:
+        raise ValueError('Run cluster solution of {0} first'.format(k))
+    # if it gets called multiple times, data get rewritten
+    labels = self.get_clusters(k)
+    # train a classifier on this clustering
+    knn = KNeighborsClassifier(n_neighbors=n_neighbors)
+    knn.fit(self.data, labels)
+    # predict
+    predicted_labels = knn.predict(newdata)
+    self._predicted[k] = predicted_labels
+
+
+def _predict(self, newdata, k):
+    """Common function to be used to predict clustering solution when method
+    has built-in prediction method"""
+    self._predicted[k] = self._methods[k].predict(newdata)
+
+
 class ClusterMethod(object):
     """Wrapper for clustering methods to add predict method and provide
     solution for different ks
@@ -100,15 +130,8 @@ class WardClusterMethod(ClusterMethod):
             self._clusters[k] = _hc_cut(k, self._method_output[0],
                                         self._method_output[2])
 
-    def predict(self, array, k):
-        if k not in self._clusters:
-            raise ValueError('Run cluster solution of {0} first'.format(k))
-        if k not in self._predicted:
-            labels = self.get_clusters(k)
-            # train a classifier on this clustering
-            knn = KNeighborsClassifier(n_neighbors=1)
-            knn.fit(self.data, labels)
-            self._predicted[k] = labels
+    def predict(self, newdata, k):
+        _predict_knn(self, newdata, k)
 
 
 class GMMClusterMethod(ClusterMethod):
@@ -133,9 +156,8 @@ class GMMClusterMethod(ClusterMethod):
         else:
             return None
 
-    def predict(self, array, k):
-        if k not in self._predicted:
-            self._predicted[k] = self._methods[k].predict(array)
+    def predict(self, newdata, k):
+        _predict(self, newdata, k)
 
 
 class KMeansClusterMethod(ClusterMethod):
@@ -159,6 +181,27 @@ class KMeansClusterMethod(ClusterMethod):
         else:
             return None
 
-    def predict(self, array, k):
-        if k not in self._predicted:
-            self._predicted[k] = self._methods[k].predict(array)
+    def predict(self, newdata, k):
+        _predict(self, newdata, k)
+
+
+class CompleteClusterMethod(ClusterMethod):
+    def __init__(self, metric='correlation', *args, **kwargs):
+        super(CompleteClusterMethod, self).__init__(complete)
+        self._args = args
+        self._kwargs = kwargs
+        self._method_output = None
+        self._methods = {}
+        self.metric = metric
+
+    def cluster(self, k):
+        # if we haven't run it already, run the clustering
+        if not self.run:
+            dist = pdist(self.data, metric=self.metric)
+            self._method_output = self.method(dist)
+            self._run = True
+        if k not in self._clusters:
+            self._clusters[k] = cut_tree_scipy(self._method_output, k)
+
+    def predict(self, newdata, k):
+        _predict_knn(self, newdata, k)

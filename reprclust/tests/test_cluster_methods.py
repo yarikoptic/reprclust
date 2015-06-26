@@ -5,7 +5,8 @@ from nose.tools import (assert_raises, assert_is_none,
 import numpy as np
 from numpy.testing import assert_array_equal
 from reprclust.cluster_methods import (ClusterMethod, GMMClusterMethod,
-                                       WardClusterMethod, KMeansClusterMethod)
+                                       WardClusterMethod, KMeansClusterMethod,
+                                       CompleteClusterMethod)
 
 # create two far blobs easy to cluster
 blob1 = 2*np.random.randn(10, 2) + 100
@@ -46,6 +47,12 @@ def _test_clustermethods(cm):
         assert_is_none(cm.cluster(k))
         assert_is_none(cm.predict(data, k))
         assert_array_equal(cm.get_clusters(k), cm.get_predicted_clusters(k))
+        # flip data and check that we actually get a different labeling
+        cm.predict(data[::-1], k)
+        assert_false(np.all(cm.get_clusters(k) ==
+                            cm.get_predicted_clusters(k)))
+        assert_array_equal(cm.get_clusters(k),
+                           cm.get_predicted_clusters(k)[::-1])
         # XXX: temporary fix. apparently GMM might return less than the
         # number of components requested
         if cm.method.__name__ is not 'GMM':
@@ -57,5 +64,6 @@ def _test_clustermethods(cm):
 
 
 def test_implemented_clustermethods():
-    for cm in [WardClusterMethod, KMeansClusterMethod, GMMClusterMethod]:
+    for cm in [WardClusterMethod, KMeansClusterMethod, GMMClusterMethod,
+               CompleteClusterMethod]:
         yield _test_clustermethods, cm()
