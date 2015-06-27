@@ -166,3 +166,32 @@ class Reproducibility(object):
         # store everything together now
         for metrics in result[0]:
             self.scores[metrics] = np.hstack((res[metrics] for res in result))
+
+    @property
+    def ks(self):
+        return self._ks
+
+    def get_ks_run(self):
+        """Return the ks for the run of the clustering algorithm"""
+        metric = self.get_metric_names()[0]
+        return self.scores[metric][0].astype(int)
+
+    def get_metric_score(self, metric):
+        return self.scores[metric][1]
+
+    def get_metric_names(self):
+        return [metric.__name__ for metric in self._cluster_metrics]
+
+    def get_array_scores(self):
+        """Return an array containing the scores in a nice formatting"""
+        metric_names = self.get_metric_names()
+
+        scores = []
+        for metric in metric_names:
+            scores.append(self.get_metric_score(metric).reshape(-1, 1))
+
+        ks = self.get_ks_run().reshape(-1, 1)
+        metric_scores = np.hstack(scores)
+        d = np.hstack((ks, metric_scores))
+        d = np.vstack((['k'] + metric_names, d))
+        return d
