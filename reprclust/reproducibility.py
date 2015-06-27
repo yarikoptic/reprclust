@@ -180,7 +180,10 @@ class Reproducibility(object):
         return self.scores[metric][1]
 
     def get_metric_names(self):
-        return [metric.__name__ for metric in self._cluster_metrics]
+        return self.scores.keys()
+
+    def get_header_scores(self):
+        return ['k'] + self.get_metric_names()
 
     def get_array_scores(self):
         """Return an array containing the scores in a nice formatting"""
@@ -193,5 +196,4 @@ class Reproducibility(object):
         ks = self.get_ks_run().reshape(-1, 1)
         metric_scores = np.hstack(scores)
         d = np.hstack((ks, metric_scores))
-        d = np.vstack((['k'] + metric_names, d))
         return d
