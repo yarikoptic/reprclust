@@ -88,9 +88,27 @@ class ClusterMethod(object):
         self._predicted = {}
         self.data = None
 
+        self._args = None
+        self._kwargs = None
+
     def __call__(self, data):
         """Just store the input data"""
         self.data = data
+
+    def __repr__(self):
+        args = []
+        if self._args:
+            for arg in self._args:
+                args.append(repr(arg))
+        if self._kwargs:
+            for key, value in self._kwargs.items():
+                args.append("{0}={1}".format(key, repr(value)))
+        if args:
+            args = ", ".join(args)
+        else:
+            args = ""
+
+        return self.__class__.__name__ + '({0})'.format(args)
 
     @property
     def run(self):

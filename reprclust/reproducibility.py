@@ -158,6 +158,19 @@ class Reproducibility(object):
             if ground_truth is not None:
                 self.scores[metric.__name__ + '_gt'] = None
 
+    def __repr__(self):
+        args = [repr(arg) for arg in [self._data, self._splitter,
+                                      self._cluster_method,
+                                      self._ks]]
+        args += ['{0}={1}'.format(key, repr(value))
+                 for key, value in [('stack', self._stack),
+                                    ('ground_truth', self._ground_truth)]]
+        args += ['cluster_metrics=[' +
+                 ', '.join([m.__name__ for m in self._cluster_metrics]) + ']']
+        args = ", ".join(args)
+
+        return self.__class__.__name__ + '({0})'.format(args)
+
     def run(self, n_jobs=1, verbose=52):
         parallel = Parallel(n_jobs=n_jobs, verbose=verbose)
         fold = delayed(_run_fold)
