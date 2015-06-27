@@ -21,10 +21,10 @@ ground_truth = np.hstack((np.zeros(10, dtype=int), np.ones(10, dtype=int)))
 
 
 def test_run_method():
-    repr = Reproducibility(dss, fake_splitter, WardClusterMethod(), ks=20,
-                           ground_truth=ground_truth)
-    assert_is_none(repr.run(n_jobs=1, verbose=0))
-    for key, value in repr.scores.items():
+    reprod = Reproducibility(dss, fake_splitter, WardClusterMethod(), ks=20,
+                             ground_truth=ground_truth)
+    assert_is_none(reprod.run(n_jobs=1, verbose=0))
+    for key, value in reprod.scores.items():
         assert_array_equal(value[0], np.arange(2, 21))
         if not key.endswith('_gt'):
             # this works only with ARI and AMI -- default
