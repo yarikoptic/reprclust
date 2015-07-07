@@ -8,6 +8,8 @@
 """
 Module containing cluster methods to uniform calling
 """
+from joblib import Memory
+
 import numpy as np
 
 from scipy.spatial.distance import pdist
@@ -18,6 +20,14 @@ from sklearn.cluster.hierarchical import _hc_cut, ward_tree
 from sklearn.mixture import GMM
 from sklearn.neighbors import KNeighborsClassifier
 
+from tempfile import mkdtemp
+
+cachedir = mkdtemp()
+memory = Memory(cachedir=cachedir, verbose=0)
+
+# cache ward_tree to save executions
+cached_ward_tree = memory.cache(ward_tree)
+# cache also complete
 
 def _cut_tree_scipy(Y, k):
     """ Given the output Y of a hierarchical clustering solution from scipy
@@ -87,9 +97,11 @@ class WardClusterMethod(ClusterMethod):
 
     def train(self, data, k, compute_full=True):
         # if we haven't run it the first time, need to run it
-        if not self.is_trained and compute_full:
+        # XXX: this is not really needed here
+        if compute_full:
             self._children, self._n_components, self._n_leaves, \
-                self._parents = ward_tree(data, *self._args, **self._kwargs)
+                self._parents = cached_ward_tree(data, *self._args,
+                                                 **self._kwargs)
             self._is_trained = True
             self._train_data = data
 
@@ -110,12 +122,17 @@ class CompleteClusterMethod(ClusterMethod):
         self._method_output = None
         self._metric = metric
         self._train_data = None
+        # cache run complete
+        self._run_complete = memory.cache(self._run_complete)
+
+    def _run_complete(self, data):
+        """Just to allow caching"""
+        return complete(pdist(data, metric=self._metric))
 
     def train(self, data, k, compute_full=True):
         # if we haven't run it already, run the clustering
-        if not self.is_trained and compute_full:
-            dist = pdist(data, metric=self._metric)
-            self._method_output = complete(dist)
+        if compute_full:
+            self._method_output = self._run_complete(data)
             self._is_trained = True
             self._train_data = data
 
