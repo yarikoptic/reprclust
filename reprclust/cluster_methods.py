@@ -38,12 +38,6 @@ def _predict_knn(train_data, data, labels, n_neighbors=1):
     return predicted_labels
 
 
-def _predict(self, newdata, k):
-    """Common function to be used to predict clustering solution when method
-    has built-in prediction method"""
-    self._predicted[k] = self._methods[k].predict(newdata)
-
-
 class ClusterMethod(object):
     """Wrapper for clustering methods to add predict method and provide
     solution for different ks
@@ -117,7 +111,7 @@ class CompleteClusterMethod(ClusterMethod):
         self._metric = metric
         self._train_data = None
 
-    def train(self, k, data, compute_full=True):
+    def train(self, data, k, compute_full=True):
         # if we haven't run it already, run the clustering
         if not self.is_trained and compute_full:
             dist = pdist(data, metric=self._metric)
