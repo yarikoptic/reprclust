@@ -140,11 +140,12 @@ def test_correlation_method():
 
 def test_correlation_score():
     # (n_features, n_samples) in PyMVPA terminology
-    clust1 = np.random.normal(-5, 1, size=(5, 10))
-    clust2 = np.random.normal(5, 1, size=(5, 10))
-    true_clust = np.hstack((np.ones(5), np.zeros(5))).astype(int)
-    d = np.hstack((clust1, clust2))
+    clust1 = np.random.normal(-5, 1, size=(50, 10))
+    clust2 = np.random.normal(5, 1, size=(50, 10))
+    true_clust = np.hstack((np.ones(50), np.zeros(50))).astype(int)
+    d = np.vstack((clust1, clust2))
     for corr_type in ('spearman', 'pearson'):
         correlation_score = CorrelationScore(corr_type=corr_type)
         assert_raises(ValueError, correlation_score, true_clust, true_clust)
-        assert_equal(correlation_score(true_clust, true_clust, data=d), 1.0)
+        assert_almost_equal(correlation_score(true_clust, true_clust, data=d),
+                            1.0)

@@ -127,7 +127,7 @@ class CorrelationScore(ClusterMetric):
             assert(len(np.unique(data[test_label == i, :])) > 0)
             assert(len(np.unique(data[predicted_label == i, :])) > 0)
             c1 = np.mean(data[test_label == i, :], axis=0)
-            c2 = np.mean(data[predicted_label == i, :], axis=-1)
+            c2 = np.mean(data[predicted_label == i, :], axis=0)
             if corr_type == 'pearson':
                 corr += self._correlation(rankdata(c1), rankdata(c2))
             elif corr_type == 'spearman':
