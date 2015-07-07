@@ -117,7 +117,8 @@ def test_instability_class():
     ks = np.arange(2, len(a)+1)
     rand_scores = rand_instability_score(ks, len(a), s)
     instability_score = InstabilityScore(rand_scores)
-    assert_equal(instability_score(a, b, 9), 0)
+    assert_equal(instability_score(a, b, k=9), 0)
+    assert_raises(ValueError, instability_score, a, b)
     for i in xrange(20):
         a = generate_random_labeling(5, 10)
         b = generate_random_labeling(5, 10)
@@ -125,7 +126,7 @@ def test_instability_class():
         rand_scores = rand_instability_score(ks, len(a), s)
         instability_score = InstabilityScore(rand_scores)
         for k in ks:
-            score = instability_score(a, b, k)
+            score = instability_score(a, b, k=k)
             assert_greater_equal(score, 0.)
 
 
@@ -144,4 +145,5 @@ def test_correlation_score():
     d = np.hstack((clust1, clust2))
     for corr_type in ('spearman', 'pearson'):
         correlation_score = CorrelationScore(corr_type=corr_type)
-        assert_equal(correlation_score(true_clust, true_clust, d), 1.0)
+        assert_raises(ValueError, correlation_score, true_clust, true_clust)
+        assert_equal(correlation_score(true_clust, true_clust, data=d), 1.0)

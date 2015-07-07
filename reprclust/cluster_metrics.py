@@ -52,7 +52,7 @@ class ClusterMetric(object):
         self._args = args
         self._kwargs = kwargs
 
-    def __call__(self, test_label, predicted_label, data, *args, **kwargs):
+    def __call__(self, test_label, predicted_label, data=None, k=None):
         raise NotImplementedError
 
 
@@ -60,7 +60,7 @@ class ARI(ClusterMetric):
     def __init__(self):
         super(ARI, self).__init__()
 
-    def __call__(self, test_label, predicted_label, *args, **kwargs):
+    def __call__(self, test_label, predicted_label, **kwargs):
         return adjusted_rand_score(test_label, predicted_label)
 
 
@@ -68,7 +68,7 @@ class AMI(ClusterMetric):
     def __init__(self):
         super(AMI, self).__init__()
 
-    def __call__(self, test_label, predicted_label, *args, **kwargs):
+    def __call__(self, test_label, predicted_label, **kwargs):
         return adjusted_mutual_info_score(test_label, predicted_label)
 
 
@@ -77,7 +77,11 @@ class CorrelationScore(ClusterMetric):
         super(CorrelationScore, self).__init__()
         self._corr_type = corr_type
 
-    def __call__(self, test_label, predicted_label, data, *args, **kwargs):
+    def __call__(self, test_label, predicted_label, data=None, *args,
+                 **kwargs):
+        if data is None:
+            raise ValueError('CorrelationScore needs data to compute '
+                             'correlation of')
         return self._correlation_score(predicted_label, test_label, data,
                                        corr_type=self._corr_type)
 
@@ -136,7 +140,9 @@ class InstabilityScore(ClusterMetric):
         super(InstabilityScore, self).__init__()
         self._normalization_scores = normalization_scores
 
-    def __call__(self, test_label, predicted_label, k, *args, **kwargs):
+    def __call__(self, test_label, predicted_label, k=None, **kwargs):
+        if k is None:
+            raise ValueError('Need to provide a k for instability score')
         if k not in self._normalization_scores:
             raise ValueError('Provided normalization scores do not have '
                              'selected value of k {0}'.format(k))
