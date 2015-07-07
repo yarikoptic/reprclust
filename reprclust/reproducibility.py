@@ -43,7 +43,7 @@ import numpy as np
 from reprclust.cluster_methods import ClusterMethod
 from reprclust.cluster_metrics import ari, ami
 
-# this must be outside the class to allow parallelization
+# this must be outside to allow parallelization
 def _run_fold(data, train, test, cluster_method, ks, stack=False,
               ground_truth=None, cluster_metrics=(ari, ami)):
     """Run reproducibility algorithm on one fold for all the ks"""
@@ -52,7 +52,6 @@ def _run_fold(data, train, test, cluster_method, ks, stack=False,
     cm_test = copy.deepcopy(cm_train)
 
     # XXX: this should change depending on the type of data
-    # link clustering method to data
     data_train = [data[tr_idx] for tr_idx in train]
     data_test = [data[te_idx] for te_idx in test]
 
@@ -66,8 +65,7 @@ def _run_fold(data, train, test, cluster_method, ks, stack=False,
     # allocate storing dictionary
     result_fold = {}
     for metric in cluster_metrics:
-        result_fold[metric.__name__] = \
-            np.vstack((ks, np.zeros(len(ks))))
+        result_fold[metric.__name__] = np.vstack((ks, np.zeros(len(ks))))
         if ground_truth is not None:
             result_fold[metric.__name__ + '_gt'] = \
                 np.vstack((ks, np.zeros(len(ks))))
