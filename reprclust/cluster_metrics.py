@@ -55,6 +55,9 @@ class ClusterMetric(object):
     def __call__(self, test_label, predicted_label, data=None, k=None):
         raise NotImplementedError
 
+    def __str__(self):
+        return self.__class__.__name__
+
 
 class ARI(ClusterMetric):
     def __init__(self):
