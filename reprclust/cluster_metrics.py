@@ -122,10 +122,12 @@ class CorrelationScore(ClusterMetric):
         unique_pred = np.unique(predicted_label)
         labels = np.intersect1d(unique_test, unique_pred, assume_unique=True)
         for i in labels:
-            assert(len(np.unique(data[:, test_label == i])) > 0)
-            assert(len(np.unique(data[:, predicted_label == i])) > 0)
-            c1 = np.mean(data[:, test_label == i], axis=-1)
-            c2 = np.mean(data[:, predicted_label == i], axis=-1)
+            # XXX: assume that data are (n_features, n_samples) in PyMVPA
+            # terminology
+            assert(len(np.unique(data[test_label == i, :])) > 0)
+            assert(len(np.unique(data[predicted_label == i, :])) > 0)
+            c1 = np.mean(data[test_label == i, :], axis=0)
+            c2 = np.mean(data[predicted_label == i, :], axis=-1)
             if corr_type == 'pearson':
                 corr += self._correlation(rankdata(c1), rankdata(c2))
             elif corr_type == 'spearman':
