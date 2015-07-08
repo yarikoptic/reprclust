@@ -28,6 +28,10 @@ memory = Memory(cachedir=cachedir, verbose=0)
 # cache ward_tree to save executions
 cached_ward_tree = memory.cache(ward_tree)
 # cache also complete
+@memory.cache
+def _run_complete(data, metric='correlation'):
+    """Just to allow caching"""
+    return complete(pdist(data, metric=metric))
 
 def _cut_tree_scipy(Y, k):
     """ Given the output Y of a hierarchical clustering solution from scipy
@@ -122,17 +126,11 @@ class CompleteClusterMethod(ClusterMethod):
         self._method_output = None
         self._metric = metric
         self._train_data = None
-        # cache run complete
-        self._run_complete = memory.cache(self._run_complete)
-
-    def _run_complete(self, data):
-        """Just to allow caching"""
-        return complete(pdist(data, metric=self._metric))
 
     def train(self, data, k, compute_full=True):
         # if we haven't run it already, run the clustering
         if compute_full:
-            self._method_output = self._run_complete(data)
+            self._method_output = _run_complete(data, metric=self._metric)
             self._is_trained = True
             self._train_data = data
 
