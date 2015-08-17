@@ -51,7 +51,6 @@ from sklearn.mixture import GMM
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.utils.linear_assignment_ import linear_assignment
 
-
 AVAILABLE_METHODS = ['ward', 'complete', 'gmm', 'kmeans']
 
 
