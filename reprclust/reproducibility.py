@@ -38,29 +38,41 @@ import copy
 
 from joblib import Parallel, delayed
 
+from mvpa2.datasets.base import Dataset
+from mvpa2.mappers.fx import mean_group_sample
+
 import numpy as np
 
 from reprclust.cluster_metrics import ARI, AMI
 
 # this must be outside to allow parallelization
-def _run_fold(data, train, test, cluster_method, ks, stack=False,
-              ground_truth=None, cluster_metrics=(ARI(), AMI())):
+def _run_fold(data, train, test, cluster_method, ks, fold_fx=None,
+              ground_truth=None, cluster_metrics=(ARI(), AMI()),
+              sa_space='chunks', fa_space=None):
     """Run reproducibility algorithm on one fold for all the ks"""
     # initialize methods
+    if not isinstance(data, Dataset):
+        raise TypeError('Input must be a PyMVPA Dataset')
+    if sa_space and fa_space:
+        raise ValueError('At the moment only one of sa_space or fa_space can be specified, not together')
+
     cm_train = cluster_method
     cm_test = copy.deepcopy(cm_train)
 
-    # XXX: this should change depending on the type of data
-    data_train = [data[tr_idx] for tr_idx in train]
-    data_test = [data[te_idx] for te_idx in test]
-
-    if stack:
-        data_train = np.vstack(data_train)
-        data_test = np.vstack(data_train)
+    if sa_space:
+        if sa_space not in data.sa.keys():
+            raise KeyError('{0} is not present in data.sa: {1}'.format(sa_space, data.sa.keys()))
+        data_train = data[np.in1d(data.sa[sa_space], train)]
+        data_test = data[np.in1d(data.sa[sa_space], test)]
     else:
-        data_train = np.mean(np.dstack(data_train), axis=-1)
-        data_test = np.mean(np.dstack(data_test), axis=-1)
+        if fa_space not in data.fa.keys():
+            raise KeyError('{0} is not present in data.fa: {1}'.format(fa_space, data.fa.keys()))
+        data_train = data[:, np.in1d(data.fa[fa_space], train)]
+        data_test = data[:, np.in1d(data.fa[fa_space], test)]
 
+    if fold_fx:
+        data_train = fold_fx(data_train)
+        data_test = fold_fx(data_test)
     # allocate storing dictionary
     result_fold = {}
     for metric in cluster_metrics:
@@ -72,26 +84,27 @@ def _run_fold(data, train, test, cluster_method, ks, stack=False,
     for i_k, k in enumerate(ks):
         # Step 1. Clustering on training/test set and prediction
         # cluster on training set
-        cm_train.train(data_train, k, compute_full=True)
+        cm_train.train(data_train.samples, k, compute_full=True)
         # cluster on test set
-        cm_test.train(data_test, k, compute_full=True)
+        cm_test.train(data_test.samples, k, compute_full=True)
 
         # predict
-        predicted_label = cm_train.predict(data_test, k)
-        test_label = cm_test.predict(data_test, k)
+        predicted_label = cm_train.predict(data_test.samples, k)
+        test_label = cm_test.predict(data_test.samples, k)
 
         # Step 2. Compute scores and store them
         for metric in cluster_metrics:
             result_fold[str(metric)][1, i_k] = \
-                metric(predicted_label, test_label, data=data_test, k=k)
+                metric(predicted_label, test_label, data=data_test.samples, k=k)
             if ground_truth is not None:
                 result_fold[str(metric) + '_gt'][1, i_k] = \
-                    metric(predicted_label, ground_truth, data=data_test, k=k)
+                    metric(predicted_label, ground_truth, data=data_test.samples, k=k)
     return result_fold
 
 
 def reproducibility(data, splitter, cluster_method, ks, ground_truth=None,
-                    stack=False, cluster_metrics=(ARI(), AMI()),
+                    fold_fx=None, cluster_metrics=(ARI(), AMI()),
+                    sa_space='chunks', fa_space=None,
                     n_jobs=1, verbose=51):
     if not isinstance(ks, (list, np.ndarray)):
         raise ValueError('ks must be a list or numpy array')
@@ -99,8 +112,9 @@ def reproducibility(data, splitter, cluster_method, ks, ground_truth=None,
     fold = delayed(_run_fold)
     results = parallel(fold(data, train, test, cluster_method, ks,
                             ground_truth=ground_truth,
-                            stack=stack,
-                            cluster_metrics=cluster_metrics)
+                            fold_fx=fold_fx,
+                            cluster_metrics=cluster_metrics,
+                            sa_space=sa_space, fa_space=fa_space)
                        for train, test in splitter)
 
     scores = {}
