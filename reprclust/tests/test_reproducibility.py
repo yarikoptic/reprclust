@@ -1,5 +1,5 @@
+from mvpa2.datasets.base import Dataset
 import numpy as np
-
 from numpy.testing import assert_array_equal
 
 from nose.tools import assert_is_none, assert_equal
@@ -19,6 +19,9 @@ idx_train = idx_test = range(10)
 fake_splitter = [(idx_train, idx_test)]
 ground_truth = np.hstack((np.zeros(10, dtype=int), np.ones(10, dtype=int)))
 
+dss = np.hstack(dss)
+dss = Dataset(dss, sa={'chunks': range(20)},
+              fa={'subjects': np.repeat(range(10), 2)})
 
 def test_run_method():
     scores = reproducibility(dss, fake_splitter, WardClusterMethod(),

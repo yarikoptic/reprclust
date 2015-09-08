@@ -48,7 +48,7 @@ from reprclust.cluster_metrics import ARI, AMI
 # this must be outside to allow parallelization
 def _run_fold(data, train, test, cluster_method, ks, fold_fx=None,
               ground_truth=None, cluster_metrics=(ARI(), AMI()),
-              sa_space='chunks', fa_space=None):
+              sa_space=None, fa_space='subjects'):
     """Run reproducibility algorithm on one fold for all the ks"""
     # initialize methods
     if not isinstance(data, Dataset):
@@ -104,7 +104,7 @@ def _run_fold(data, train, test, cluster_method, ks, fold_fx=None,
 
 def reproducibility(data, splitter, cluster_method, ks, ground_truth=None,
                     fold_fx=None, cluster_metrics=(ARI(), AMI()),
-                    sa_space='chunks', fa_space=None,
+                    sa_space=None, fa_space='subjects',
                     n_jobs=1, verbose=51):
     if not isinstance(ks, (list, np.ndarray)):
         raise ValueError('ks must be a list or numpy array')
