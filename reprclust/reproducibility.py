@@ -70,13 +70,14 @@ def _run_fold(data, train, test, cluster_method, ks, fold_fx=None,
     else:
         raise ValueError('We should not get here')
 
-    if fold_fx:
-        data_train = fold_fx(data_train)
-        data_test = fold_fx(data_test)
-    # exctract samples to cluster and transpose because clustering methods cluster rows
+    if fold_fx is None:
+        fold_fx = lambda x, y: (x.samples, y.samples)
+
+    # apply fold_fx and transpose because clustering methods cluster rows
     # while we want to cluster columns (features)
-    samples_train = data_train.samples.T
-    samples_test = data_test.samples.T
+    samples_train, samples_test = fold_fx(data_train, data_test)
+    samples_train = samples_train.T
+    samples_test = samples_test.T
 
     # allocate storing dictionary
     result_fold = {}
@@ -121,14 +122,12 @@ def reproducibility(data, splitter, cluster_method, ks, ground_truth=None,
     cluster_method : list of ClusterMethod from reprclust.cluster_methods
     ks : list or np.ndarray
     ground_truth : list or np.ndarray
-    fold_fx : callable
+    fold_fx : callable applied to (data_train, data_test) that returns a
+        tuple of np.ndarray corresponding to the modified input
     cluster_metrics : list of ClusterMetric from reprclust.cluster_metrics
-    sa_space : str
-        Sample Attribute to which the splitter is applied. Only one of sa_space
-        or fa_space is allowed.
-    fa_space : srt
-        Feature Attribute to which the splitter is applied. Only one of sa_space
-        or fa_space is allowed.
+    space : str
+        In the format of 'attr.attr_space' (e.g., 'sa.subjects'), where to apply
+        the splitter.
     n_jobs : int
     verbose : int
     """
