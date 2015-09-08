@@ -106,6 +106,27 @@ def reproducibility(data, splitter, cluster_method, ks, ground_truth=None,
                     fold_fx=None, cluster_metrics=(ARI(), AMI()),
                     sa_space=None, fa_space='subjects',
                     n_jobs=1, verbose=51):
+    """
+    Runs the reproducibility algorithm on the data.
+
+    Arguments
+    ---------
+    data : mvpa2 Dataset
+    splitter : generator or equivalent
+    cluster_method : list of ClusterMethod from reprclust.cluster_methods
+    ks : list or np.ndarray
+    ground_truth : list or np.ndarray
+    fold_fx : callable
+    cluster_metrics : list of ClusterMetric from reprclust.cluster_metrics
+    sa_space : str
+        Sample Attribute to which the splitter is applied. Only one of sa_space
+        or fa_space is allowed.
+    fa_space : srt
+        Feature Attribute to which the splitter is applied. Only one of sa_space
+        or fa_space is allowed.
+    n_jobs : int
+    verbose : int
+    """
     if not isinstance(ks, (list, np.ndarray)):
         raise ValueError('ks must be a list or numpy array')
     parallel = Parallel(n_jobs=n_jobs, verbose=verbose)
