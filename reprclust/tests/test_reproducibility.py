@@ -40,5 +40,5 @@ def test_run_fold():
     common_args = (fake_splitter[0][0], fake_splitter[0][1], WardClusterMethod, [2, 3])
     # check raises
     assert_raises(TypeError, _run_fold, blob1, *common_args)
-    assert_raises(KeyError, _run_fold, dss, *common_args, space='sa.runs')
+    assert_raises(KeyError, _run_fold, dss, *common_args, spaces=['sa.runs'])
 
