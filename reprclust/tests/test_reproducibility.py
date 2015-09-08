@@ -10,7 +10,8 @@ from reprclust.reproducibility import reproducibility, _run_fold
 # create two far blobs easy to cluster
 blob1 = 2*np.random.randn(10, 2) + 100
 blob2 = 2*np.random.randn(10, 2) - 100
-data = np.vstack((blob1, blob2))
+# 2 samples for 20 features
+data = np.vstack((blob1, blob2)).T
 
 # add some noise and transpose
 dss = [(data + np.random.randn(*data.shape)) for i in xrange(10)]
@@ -19,9 +20,8 @@ idx_train = idx_test = range(10)
 fake_splitter = [(idx_train, idx_test)]
 ground_truth = np.hstack((np.zeros(10, dtype=int), np.ones(10, dtype=int)))
 
-dss = np.hstack(dss)
-dss = Dataset(dss, sa={'chunks': range(20)},
-              fa={'subjects': np.repeat(range(10), 2)})
+dss = np.vstack(dss)
+dss = Dataset(dss, sa={'subjects': np.repeat(range(10), 2)})
 
 def test_run_method():
     scores = reproducibility(dss, fake_splitter, WardClusterMethod(),
@@ -40,7 +40,5 @@ def test_run_fold():
     common_args = (fake_splitter[0][0], fake_splitter[0][1], WardClusterMethod, [2, 3])
     # check raises
     assert_raises(TypeError, _run_fold, blob1, *common_args)
-    assert_raises(ValueError, _run_fold, dss, *common_args, fa_space='subjects', sa_space='chunks')
-    assert_raises(KeyError, _run_fold, dss, *common_args, fa_space='runs')
-    assert_raises(KeyError, _run_fold, dss, *common_args, fa_space=None, sa_space='runs')
+    assert_raises(KeyError, _run_fold, dss, *common_args, space='sa.runs')
 

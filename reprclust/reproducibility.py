@@ -48,31 +48,36 @@ from reprclust.cluster_metrics import ARI, AMI
 # this must be outside to allow parallelization
 def _run_fold(data, train, test, cluster_method, ks, fold_fx=None,
               ground_truth=None, cluster_metrics=(ARI(), AMI()),
-              sa_space=None, fa_space='subjects'):
+              space='sa.subjects'):
     """Run reproducibility algorithm on one fold for all the ks"""
-    # initialize methods
     if not isinstance(data, Dataset):
         raise TypeError('Input must be a PyMVPA Dataset')
-    if sa_space and fa_space:
-        raise ValueError('At the moment only one of sa_space or fa_space can be specified, not together')
 
+    attr, attr_space = space.split('.')
+    if attr_space not in getattr(data, attr).keys():
+        raise KeyError('{0} is not present in data.{1}: {2}'.format(attr_space, attr,
+                                                                    getattr(data, attr).keys()))
+    # initialize methods
     cm_train = cluster_method
     cm_test = copy.deepcopy(cm_train)
 
-    if sa_space:
-        if sa_space not in data.sa.keys():
-            raise KeyError('{0} is not present in data.sa: {1}'.format(sa_space, data.sa.keys()))
-        data_train = data[np.in1d(data.sa[sa_space], train)]
-        data_test = data[np.in1d(data.sa[sa_space], test)]
+    if attr == 'sa':
+        data_train = data[np.in1d(data.sa[attr_space], train)]
+        data_test = data[np.in1d(data.sa[attr_space], test)]
+    elif attr == 'fa':
+        data_train = data[:, np.in1d(data.fa[attr_space], train)]
+        data_test = data[:, np.in1d(data.fa[attr_space], test)]
     else:
-        if fa_space not in data.fa.keys():
-            raise KeyError('{0} is not present in data.fa: {1}'.format(fa_space, data.fa.keys()))
-        data_train = data[:, np.in1d(data.fa[fa_space], train)]
-        data_test = data[:, np.in1d(data.fa[fa_space], test)]
+        raise ValueError('We should not get here')
 
     if fold_fx:
         data_train = fold_fx(data_train)
         data_test = fold_fx(data_test)
+    # exctract samples to cluster and transpose because clustering methods cluster rows
+    # while we want to cluster columns (features)
+    samples_train = data_train.samples.T
+    samples_test = data_test.samples.T
+
     # allocate storing dictionary
     result_fold = {}
     for metric in cluster_metrics:
@@ -84,27 +89,27 @@ def _run_fold(data, train, test, cluster_method, ks, fold_fx=None,
     for i_k, k in enumerate(ks):
         # Step 1. Clustering on training/test set and prediction
         # cluster on training set
-        cm_train.train(data_train.samples, k, compute_full=True)
+        cm_train.train(samples_train, k, compute_full=True)
         # cluster on test set
-        cm_test.train(data_test.samples, k, compute_full=True)
+        cm_test.train(samples_test, k, compute_full=True)
 
         # predict
-        predicted_label = cm_train.predict(data_test.samples, k)
-        test_label = cm_test.predict(data_test.samples, k)
+        predicted_label = cm_train.predict(samples_test, k)
+        test_label = cm_test.predict(samples_test, k)
 
         # Step 2. Compute scores and store them
         for metric in cluster_metrics:
             result_fold[str(metric)][1, i_k] = \
-                metric(predicted_label, test_label, data=data_test.samples, k=k)
+                metric(predicted_label, test_label, data=samples_test, k=k)
             if ground_truth is not None:
                 result_fold[str(metric) + '_gt'][1, i_k] = \
-                    metric(predicted_label, ground_truth, data=data_test.samples, k=k)
+                    metric(predicted_label, ground_truth, data=samples_test, k=k)
     return result_fold
 
 
 def reproducibility(data, splitter, cluster_method, ks, ground_truth=None,
                     fold_fx=None, cluster_metrics=(ARI(), AMI()),
-                    sa_space=None, fa_space='subjects',
+                    space='sa.subjects',
                     n_jobs=1, verbose=51):
     """
     Runs the reproducibility algorithm on the data.
@@ -135,7 +140,7 @@ def reproducibility(data, splitter, cluster_method, ks, ground_truth=None,
                             ground_truth=ground_truth,
                             fold_fx=fold_fx,
                             cluster_metrics=cluster_metrics,
-                            sa_space=sa_space, fa_space=fa_space)
+                            space=space)
                        for train, test in splitter)
 
     scores = {}
