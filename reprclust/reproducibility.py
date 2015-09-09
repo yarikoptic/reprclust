@@ -58,15 +58,22 @@ def _run_fold(data, split, cluster_method, ks, fold_fx=None,
             raise KeyError('{0} is not present in data.{1}: {2}'.format(attr_space, attr,
                                                                      getattr(data, attr).keys()))
 
+    mask_sa_train = np.ones(data.nsamples, dtype=bool)
+    mask_sa_test = np.ones(data.nsamples, dtype=bool)
+    mask_fa_train = np.ones(data.nfeatures, dtype=bool)
+    mask_fa_test = np.ones(data.nfeatures, dtype=bool)
     for (train, test), (attr, attr_space) in zip(split, spaces_split):
         if attr == 'sa':
-            data_train = data[np.in1d(data.sa[attr_space], train)]
-            data_test = data[np.in1d(data.sa[attr_space], test)]
+            mask_sa_train &= np.in1d(data.sa[attr_space], train)
+            mask_sa_test &= np.in1d(data.sa[attr_space], test)
         elif attr == 'fa':
-            data_train = data[:, np.in1d(data.fa[attr_space], train)]
-            data_test = data[:, np.in1d(data.fa[attr_space], test)]
+            mask_fa_train &= np.in1d(data.fa[attr_space], train)
+            mask_fa_test &= np.in1d(data.fa[attr_space], test)
         else:
             raise ValueError('We should not get here')
+
+    data_train = data[mask_sa_train, mask_fa_train]
+    data_test = data[mask_sa_test, mask_fa_test]
 
     if fold_fx is None:
         fold_fx = lambda x, y: (x.samples, y.samples)

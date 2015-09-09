@@ -1,3 +1,4 @@
+from mock import patch
 from mvpa2.datasets.base import Dataset
 import numpy as np
 from numpy.testing import assert_array_equal
@@ -21,7 +22,8 @@ fake_splitter = [(idx_train, idx_test)]
 ground_truth = np.hstack((np.zeros(10, dtype=int), np.ones(10, dtype=int)))
 
 dss = np.vstack(dss)
-dss = Dataset(dss, sa={'subjects': np.repeat(range(10), 2)})
+dss = Dataset(dss, sa={'subjects': np.repeat(range(10), 2),
+                       'runs': np.tile(range(2), 10)})
 
 def test_run_method():
     scores = reproducibility(dss, fake_splitter, WardClusterMethod(),
@@ -37,8 +39,38 @@ def test_run_method():
             assert_equal(value[1, 0], 1.)
 
 def test_run_fold():
-    common_args = (fake_splitter[0][0], fake_splitter[0][1], WardClusterMethod, [2, 3])
+    common_args = (fake_splitter, WardClusterMethod(), [2, 3])
     # check raises
     assert_raises(TypeError, _run_fold, blob1, *common_args)
-    assert_raises(KeyError, _run_fold, dss, *common_args, spaces=['sa.runs'])
+    assert_raises(KeyError, _run_fold, dss, *common_args, spaces=['sa.chunks'])
+
+def test_nested_fold():
+    splitter_subjects = [(range(5), range(5, 10))]
+    splitter_runs = [([0], [1])]
+
+    class FoldFxStore(object):
+        def __init__(self):
+            self.train = []
+            self.test = []
+            self.calls = 0
+        def __call__(self, data_train, data_test):
+            self.calls += 1
+            self.train.append(data_train)
+            self.test.append(data_test)
+            return data_train.samples, data_test.samples
+
+    mock_foldfx = FoldFxStore()
+
+    scores = reproducibility(dss, [splitter_subjects, splitter_runs],
+                             WardClusterMethod(),
+                             spaces=['sa.subjects', 'sa.runs'],
+                             fold_fx=mock_foldfx,
+                             ks=[2],
+                             ground_truth=ground_truth, verbose=0)
+
+    assert_equal(mock_foldfx.calls, 1)
+    assert_array_equal(np.unique(mock_foldfx.train[0].sa.subjects), splitter_subjects[0][0])
+    assert_array_equal(np.unique(mock_foldfx.train[0].sa.runs), splitter_runs[0][0])
+    assert_array_equal(np.unique(mock_foldfx.test[0].sa.subjects), splitter_subjects[0][1])
+    assert_array_equal(np.unique(mock_foldfx.test[0].sa.runs), splitter_runs[0][1])
 
