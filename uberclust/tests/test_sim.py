@@ -50,8 +50,9 @@ def test_get_intrinsic_noises():
 def test_simple_sim1_clean_per_subject():
     # no noise -- all must be clear
     # similarities per each of the clusters
-    sims = [[0.9], [0.8], [0.5], [0.3]]
-    args = (64, 64), sims
+    dissims = [[0.9], [0.8], [0.5], [0.3]]
+    ncats = 2
+    args = (64, 64), dissims
     kwargs = dict(
         roi_neighborhood=Sphere(6),
         nruns=3, nsubjects=2
@@ -64,18 +65,20 @@ def test_simple_sim1_clean_per_subject():
         noise_independent_std=0,
         noise_common_std=0,
         **kwargs)
-    import pdb; pdb.set_trace()
-    # ,1 since we have only 1 value of dissim per each or ROIs
-    assert_equal(signal_clean.shape, (64, 64, 1))
+    assert_equal(signal_clean.shape, (ncats, 64, 64))
     # all dss should be identical to a_clean
     for ds in dss:
-        for samples in ds[0].a.mapper.reverse(ds).samples:
-            assert_array_almost_equal(
-                signal_clean[..., 0],
-                samples)
+        assert_equal(ds.shape, (ncats*3, 64*64))
+        for c in xrange(3):
+            for itarget, sample in enumerate(ds[0].a.mapper.reverse(ds).samples):
+                assert_array_almost_equal(
+                    signal_clean[itarget % ncats],
+                    sample)
 
 
-    # Now lets generate common noise
+    # Now lets generate common structured noise, which per se has nothing to do with the
+    # dissimilarity structures we provided
+
     signal_clean, cluster_truth, dss = simple_sim1(
         *args,
         noise_subject_std=0,

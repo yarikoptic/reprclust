@@ -147,7 +147,8 @@ def simple_sim1(shape, dissims,
                 # different weights per each run.
                 # Again -- might be fun for someone to cluster, but not for us
                 # since it would not be representative of the original signal
-                noise_common_n=1, noise_common_std=0.4, noise_common_smooth=2.
+                noise_common_arrangement='stripes',
+                noise_common_n=3, noise_common_std=0.4, noise_common_smooth=2.
                 ):
     """Simulate "data" based on dissimilarity/clusters structure
 
@@ -202,8 +203,10 @@ def simple_sim1(shape, dissims,
     noise_common_n, noise_common_std, noise_common_smooth:
       characteristics of "Intrinsic common signal" -- probably generalizes across
       subjects and fun for someone studying veins to get those
-      reproducible clusters.  It will be mixed in also with
-      different weights per each run.
+      reproducible clusters.  Assumption is that cluster structure is common
+      across subjects, but dissimilarity structure between targets of interest
+      will be different per each run/subject, thus this signal overall will not
+      correlate with the signal of interest.
       Again -- might be fun for someone to cluster, but not for us
       since it would not be representative of the original signal
 
@@ -216,11 +219,15 @@ def simple_sim1(shape, dissims,
         dissim = np.asanyarray(dissim)
         if dissim.ndim == 1:
             dissim = squareform(dissim)
-        dissims[i] = dissim # replace them all with square version
+        dissims[i] = dissim  # replace them all with square version
         assert(dissim.shape[0] == dissim.shape[1])
     dissims = np.asanyarray(dissims)
     nrois = len(dissims)      # number of ROIs
     ncats = dissims.shape[1]  # number of categories
+
+    if targets is None:
+        targets = ['c%d' % i for i in xrange(ncats)]
+    assert(len(targets) == ncats)
 
     # generate target clean "picture" per each subject/run
     # ncats x shape
@@ -275,15 +282,27 @@ def simple_sim1(shape, dissims,
     else:
         raise ValueError("I know only circle")
 
-    # generated randomly and will be mixed into subjects with different weights
-    # TODO: static across runs within subject??  if so -- would be no different
-    #       from having RSAs?
-    common_noises = get_intrinsic_noises(
-        signal_clean.shape,
-        std=noise_common_std,
-        sigma=noise_common_smooth,
-        n=noise_common_n)
-    assert common_noises[0].ndim == 3, "There should be no time comp"
+    # # generated randomly and will be mixed into subjects with different weights
+    # # TODO: static across runs within subject??  if so -- would be no different
+    # #       from having RSAs?
+    # common_noises = get_intrinsic_noises(
+    #     signal_clean.shape,
+    #     std=noise_common_std,
+    #     sigma=noise_common_smooth,
+    #     n=noise_common_n)
+    # assert common_noises[0].ndim == 3, "There should be no time comp"
+    #
+    # we will have common noise being present as another set of parcels
+    # which will have as well consistent structure across subjects BUT
+    # will have random data (constant offset within each parcel/target
+    # /chunk across all voxels, so valid only for "euclidean" distance
+    # case ATM
+    if noise_common_arrangement == 'stripes':
+        # let's just do vertical stripes field
+        cluster_common_noise = np.zeros(shape=shape, dtype=int)
+        cluster_common_noise[:] = (np.arange(shape[0], dtype=float)*noise_common_n/shape[0]).astype(int)
+    else:
+        raise ValueError("Unknown arrangement for common noise clusters")
 
     # Now lets generate per subject and per run data by adding some noise(s)
     # all_signals = []
@@ -302,18 +321,17 @@ def simple_sim1(shape, dissims,
         assert subj_specific_noises[0].ndim == 3, "There should be no time comp"
         # subject_signals = []
         dss_subject = []
-        subj_common_noises = [noise * np.random.normal()
-                              for noise in common_noises]
+        #subj_common_noises = [noise * np.random.normal()
+        #                      for noise in common_noises]
 
         subj_specific_mixins = generate_mixins(nruns)
-        subj_common_mixins = generate_mixins(nruns)
 
         for run in range(nruns):
             signal_run = signal_clean.copy()
             for noise in subj_specific_noises:
                 signal_run += noise * subj_specific_mixins[run]
-            for noise in subj_common_noises:
-                signal_run += noise * subj_common_mixins[run]
+            for inoise in xrange(noise_common_n):
+                signal_run[cluster_common_noise == inoise] += generate_mixins(ncats)
             # generic noise -- no common structure across subjects/runs
             signal_run += filter_each_2d(
                 np.random.normal(size=signal_clean.shape)*noise_independent_std,
@@ -322,6 +340,7 @@ def simple_sim1(shape, dissims,
             ## rollaxis to bring similarities into leading dimension
             ds = Dataset(signal_run) # np.rollaxis(signal_run, 2, 0))
             ds.sa['chunks'] = [run]
+            ds.sa['targets'] = targets
             # what did I have in mind???
             #ds.sa['dissimilarity'] = np.arange(len(sim))  # Lame one for now
             ds_flat = ds.get_mapped(FlattenMapper(shape=ds.shape[1:],
